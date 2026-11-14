@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/app.css?v=20261114dlux" />
+  <link rel="stylesheet" href="../css/app.css?v=20261114dlux2" />
 </head>
 <body class="auth-page">
   <div class="page-tabs">
@@ -68,7 +68,7 @@
     </div>
   </main>
   <script type="module">
-    import { initAuthChrome, isAdmin, isAuthenticated, listUsers, setMosaicEnabled, setPhotoLimits, listFeedback, setFeedbackRead, getAdminProcessing, plannerHref } from "../js/auth.js?v=20261114dlux";
+    import { initAuthChrome, isAdmin, isAuthenticated, listUsers, setMosaicEnabled, setPhotoLimits, listFeedback, setFeedbackRead, getAdminProcessing, plannerHref } from "../js/auth.js?v=20261114dlux2";
     await initAuthChrome();
     if (!isAuthenticated()) location.replace(plannerHref("login"));
     else if (!isAdmin()) {
