@@ -46,10 +46,11 @@ body {
   padding-right: 12px;
 }
 .page-brand strong { font-size: 15px; letter-spacing: 0.02em; }
-.page-brand span { color: var(--muted); font-size: 12px; }
+.page-brand span { color: var(--muted); font-size: 14px; }
 .page-tabs > button[role="tab"] {
-  padding: 8px 14px;
+  padding: 10px 14px;
   font-weight: 600;
+  min-height: 44px;
 }
 .page-tabs > button[role="tab"][aria-selected="true"] {
   background: var(--accent);
@@ -182,13 +183,16 @@ button, .btn {
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
   cursor: pointer;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  min-height: 44px;
 }
 button:hover, .btn:hover { border-color: var(--accent); }
 button.primary, a.btn.primary {
@@ -226,8 +230,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .stat.ok .v { color: var(--ok); }
 .stat.span-2 { grid-column: 1 / -1; }
 
-.note, .warnbox, .errorbox {
-  font-size: 12px;
+.note, .warnbox, .errorbox, .okbox {
+  font-size: 14px;
   line-height: 1.45;
   color: var(--muted);
   margin-top: 8px;
@@ -265,7 +269,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 .legend span { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
@@ -288,7 +292,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 860px) {
   #app, #mosaicApp, #findApp { grid-template-columns: 1fr; grid-template-rows: 48vh 1fr; }
   aside { border-right: 0; border-top: 1px solid var(--line); }
-  .page-tabs > button[role="tab"] { padding: 8px 10px; font-size: 13px; }
+  .page-tabs > button[role="tab"] { padding: 10px 12px; font-size: 14px; min-height: 44px; }
 }
 
 .mode-toggle {
@@ -539,12 +543,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .auth-chrome a, .auth-chrome button.linkish {
   color: var(--accent-2);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   background: none;
   border: 0;
-  padding: 6px 8px;
+  padding: 10px 12px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   font-family: inherit;
 }
@@ -562,9 +569,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 20;
   background: rgba(14, 20, 24, 0.92);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 28px 20px;
+  padding: 16px 16px 28px;
+  overflow: auto;
+  width: auto;
 }
 .feature-lock[hidden] { display: none !important; }
 .feature-lock .lock-card {
@@ -672,8 +681,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border: 1px solid var(--line);
   color: var(--text);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px;
   font: inherit;
+  min-height: 44px;
+}
+.auth-card button,
+.auth-card .btn {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
 }
 .auth-switch { margin-top: 16px; color: var(--muted); font-size: 14px; }
 .auth-switch a { color: var(--accent-2); }
@@ -876,9 +892,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border: 1px solid var(--line);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  padding: 6px 10px;
+  padding: 10px 12px;
+  min-height: 44px;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -1002,23 +1019,26 @@ h3.subhead { font-size: 13px; margin: 14px 0 6px; color: var(--muted); }
   box-shadow: 0 0 0 1px #0006;
   white-space: nowrap;
 }
-.legend-zoom { color: var(--muted); font-size: 11px; }
+.legend-zoom { color: var(--muted); font-size: 14px; }
 .swatch.locate { background: #4cc3ff; }
 .candidate.is-active { outline: 2px solid var(--accent); }
 
-/* Lock the tools, leave the map visible */
+/* Lock covers the whole locator view, with the message at the top so it is
+   visible on a phone without scrolling past the map. */
 .feature-lock {
-  inset: 0 auto 0 0;
-  width: 360px;
+  inset: 0;
+  width: auto;
   background: rgba(14, 20, 24, 0.94);
 }
 @media (max-width: 860px) {
   #findApp .map-wrap,
   #stockpileApp .map-wrap { order: -1; }
   .feature-lock {
-    inset: auto 0 0 0;
-    top: 48vh;
+    inset: 0;
+    top: 0;
     width: auto;
+    align-items: flex-start;
+    padding-top: 12px;
   }
 }
 
@@ -1094,4 +1114,70 @@ html[data-product="piletally"] label:has(#presetFindDrone),
 html[data-product="locator"] #presetStockpile,
 html[data-product="locator"] label:has(#presetStockpile) {
   display: none !important;
+}
+
+/* UX quick fixes: tap targets, draw-box mode, more-info, access requests */
+.okbox { color: var(--ok); }
+html[data-product="locator"] .okbox { color: #8be0b0; }
+
+.leaflet-control-zoom a,
+.leaflet-bar a.leaflet-control-zoom-in,
+.leaflet-bar a.leaflet-control-zoom-out {
+  width: 44px !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  font-size: 18px !important;
+}
+
+#findCanvas, #findOverlay, #findStageInner {
+  touch-action: none;
+}
+#findMap.is-draw-mode,
+#findMap.is-draw-mode .leaflet-container,
+.find-map-wrap.is-draw-mode #findMap {
+  touch-action: none;
+  cursor: crosshair;
+}
+#btnDrawQuery[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff8f4;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.more-info {
+  margin-top: 10px;
+}
+.more-info summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  list-style-position: outside;
+  padding: 8px 0;
+}
+.more-info summary::-webkit-details-marker { color: var(--muted); }
+
+.feedback-item.is-access-request { border-color: #f07a7a; }
+.feedback-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d33a3a;
+  color: #fff8f4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.lock-actions .btn,
+.lock-actions button,
+.lock-actions a.btn {
+  min-height: 44px;
+  min-width: 44px;
 }

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/app.css" />
+  <link rel="stylesheet" href="../css/app.css?v=20261114dlux" />
 </head>
 <body class="auth-page">
   <div class="page-tabs">
@@ -34,7 +34,7 @@
     </form>
   </main>
   <script type="module">
-    import { initAuthChrome, isAuthenticated, login, plannerHref } from "../js/auth.js";
+    import { initAuthChrome, isAuthenticated, login, plannerHref } from "../js/auth.js?v=20261114dlux";
     await initAuthChrome();
     if (isAuthenticated()) location.replace(plannerHref("home"));
     const form = document.getElementById("loginForm");
@@ -52,6 +52,6 @@
       }
     });
   </script>
-  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.0</footer>
+  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.1</footer>
 </body>
 </html>

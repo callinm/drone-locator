@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=20261113y" />
+  <link rel="stylesheet" href="css/app.css?v=20261114dlux" />
 </head>
 <body>
   <div class="page-tabs" role="tablist" aria-label="Drone Locator sections">
@@ -196,54 +196,60 @@
   <div id="viewFind" class="page-view">
 
     <div class="feature-lock" data-mosaic-lock data-lock-feature="Drone Locator" hidden>
-      <div class="lock-card">
+      <div class="lock-card" id="locatorLockCard">
         <h2 data-lock-title>Drone Locator is locked</h2>
-        <p data-lock-body>This mapping feature is locked. Contact an admin to enable mapping for your account.</p>
+        <p data-lock-body>Log in or create an account. After you sign in, tap Request access so an admin can turn this on for you.</p>
         <div class="lock-actions">
           <a class="btn primary" href="login/" data-lock-login>Log in</a>
           <a class="btn primary" href="signup/" data-lock-signup>Sign up</a>
+          <button type="button" class="btn primary" id="btnRequestAccess" data-lock-request hidden>Request access</button>
         </div>
+        <p class="okbox" data-lock-request-status hidden></p>
       </div>
     </div>
     <div id="findApp">
       <aside>
         <header class="brand">
           <h1>Drone Locator</h1>
-          <p>Search a stitched mosaic or orthophoto on the server</p>
+          <p>Search a map of the area for a lost aircraft</p>
         </header>
         <div class="scroll">
           <section>
-            <h2>1. Mosaic</h2>
+            <h2>1. Add your search map</h2>
             <div class="tools">
-              <button type="button" id="btnLoadMosaic" class="primary">Load mosaic / orthophoto</button>
-              <button type="button" id="btnUseOrtho" class="ghost">Use latest survey map</button>
+              <button type="button" id="btnLoadMosaic" class="primary">Load a search map</button>
               <button type="button" id="btnFindDemo" class="ghost">Load demo</button>
               <input type="file" id="fileMosaic" accept="image/jpeg,image/png,image/tiff,.jpg,.jpeg,.png,.tif,.tiff" hidden />
             </div>
-            <label class="note bounds-label">Optional geographic bounds (west, south, east, north) if the file is not a GeoTIFF
-              <input type="text" id="findBounds" placeholder="-88.2264, 40.0830, -88.2240, 40.0850" autocomplete="off" />
-            </label>
-            <p class="note" id="mosaicStatus">Load a stitched mosaic or a large JPEG / TIFF. It is uploaded once and reused for later searches. Use latest survey map if one is already on this account.</p>
+            <p class="note" id="mosaicStatus">Load a stitched map of the search area (one large photo of the ground). It is uploaded once and reused for later searches.</p>
+            <details class="more-info">
+              <summary>More options</summary>
+              <p class="note">If the file has no location built in, you can type the four corners of the area so we can give walking directions later. Enter west, south, east, and north, in that order.</p>
+              <label class="note bounds-label">Area corners (west, south, east, north)
+                <input type="text" id="findBounds" placeholder="-88.2264, 40.0830, -88.2240, 40.0850" autocomplete="off" />
+              </label>
+            </details>
           </section>
 
           <section>
-            <h2>2. Query</h2>
+            <h2>2. Show us your drone</h2>
             <div class="tools">
-              <button type="button" id="btnLoadRef" class="primary">Upload reference photo</button>
-              <button type="button" id="btnClearQuery" class="ghost">Clear query</button>
+              <button type="button" id="btnDrawQuery" class="ghost" aria-pressed="false">Draw box</button>
+              <button type="button" id="btnLoadRef" class="primary">Upload a photo of your drone</button>
+              <button type="button" id="btnClearQuery" class="ghost">Clear</button>
               <input type="file" id="fileRef" accept="image/jpeg,image/png,.jpg,.jpeg,.png" hidden />
             </div>
             <div id="refPreview" class="ref-preview" hidden></div>
-            <p class="note" id="refStatus">Click and drag a region on the mosaic, or upload a close-up of the aircraft or a marking.</p>
+            <p class="note" id="refStatus">On a phone, tap Draw box, then drag on the map. On a computer, tap Draw box or hold Shift and drag. Or upload a close-up photo of your drone or a marking on it.</p>
           </section>
 
           <section>
-            <h2>3. Search</h2>
+            <h2>3. Find it</h2>
             <div class="color-tools" id="findColorTools">
-              <label><input type="checkbox" id="findMatchColor" checked /> Match color</label>
+              <label><input type="checkbox" id="findMatchColor" checked /> Look for this color</label>
               <label>Color
                 <select id="findColorPreset">
-                  <option value="auto">From reference photo</option>
+                  <option value="auto">From the photo</option>
                   <option value="red">Red</option>
                   <option value="orange">Orange</option>
                   <option value="yellow">Yellow</option>
@@ -256,21 +262,27 @@
               <label id="findColorPickerWrap" hidden>Pick
                 <input type="color" id="findColorPicker" class="color-swatch" value="#e23d28" />
               </label>
-              <label><input type="checkbox" id="findSmallMarking" /> Small marking (fin, decal)</label>
-              <label>Size (cm)
-                <input type="number" id="findTargetSizeCm" min="1" max="80" step="1" placeholder="e.g. 6" style="width:5.5em" />
-              </label>
-              <label>GSD (cm/px)
-                <input type="number" id="findGsdCm" min="0.01" max="50" step="0.01" placeholder="optional" style="width:5.5em" />
-              </label>
-              <label>Altitude (m)
-                <input type="number" id="findAltitudeM" min="1" max="500" step="1" placeholder="if no EXIF" style="width:5.5em" />
-              </label>
             </div>
             <div class="tools">
-              <button type="button" id="btnFindSearch" class="primary" disabled>Search mosaic</button>
+              <button type="button" id="btnFindSearch" class="primary" disabled>Search</button>
             </div>
-            <p class="note" id="findProgress">Matching runs on a small local service, not in the browser, so a large orthophoto will not freeze your phone. Small marking defaults to color-only and skips very low-altitude frames; GSD is floored so near-ground shots do not treat car windows as 6 cm targets. Match color looks for the paint against the field.</p>
+            <p class="note" id="findProgress">The search runs on the server, so a large map will not freeze your phone. Turn on “Look for this color” to hunt for your drone’s paint against the field.</p>
+            <details class="more-info">
+              <summary>More options</summary>
+              <div class="color-tools">
+                <label><input type="checkbox" id="findSmallMarking" /> It is a small marking (fin or sticker)</label>
+                <label>Marking size (cm)
+                  <input type="number" id="findTargetSizeCm" min="1" max="80" step="1" placeholder="e.g. 6" style="width:5.5em" />
+                </label>
+                <label>Ground detail (cm per pixel)
+                  <input type="number" id="findGsdCm" min="0.01" max="50" step="0.01" placeholder="optional" style="width:5.5em" />
+                </label>
+                <label>Flight height (meters)
+                  <input type="number" id="findAltitudeM" min="1" max="500" step="1" placeholder="optional" style="width:5.5em" />
+                </label>
+              </div>
+              <p class="note">Use these only if you know the size of a small marking, how detailed the map is, or how high the photos were taken.</p>
+            </details>
             <p class="warnbox" id="findWarn" hidden></p>
             <p class="errorbox" id="findError" hidden></p>
           </section>
@@ -278,7 +290,7 @@
           <section>
             <h2>Matches</h2>
             <div id="findResults" class="candidate-list">
-              <p class="note">Top matches will appear here with a score, a box on the mosaic, and a GPS point when the mosaic is georeferenced.</p>
+              <p class="note">Top matches will appear here with a score, a box on the map, and a location you can walk to when the map has GPS.</p>
             </div>
           </section>
         </div>
@@ -297,9 +309,9 @@
         </div>
         <div class="legend" id="findLegend">
           <span><i class="swatch locate"></i> Your location</span>
-          <span><i class="swatch field"></i> Survey map</span>
-          <span><i class="swatch path"></i> Query region</span>
-          <span><i class="dot"></i> Match and confidence</span>
+          <span><i class="swatch field"></i> Search map</span>
+          <span><i class="swatch path"></i> Area you marked</span>
+          <span><i class="dot"></i> Match and score</span>
           <span class="legend-zoom">Use Zoom in (+) and Zoom out (−)</span>
         </div>
       </div>
@@ -308,9 +320,9 @@
 
 
   <div id="tutorialHost" hidden></div>
-  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.0</footer>
+  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.1</footer>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="js/app.js?v=20261113y"></script>
+  <script type="module" src="js/app.js?v=20261114dlux"></script>
 </body>
 </html>

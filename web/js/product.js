@@ -3,7 +3,7 @@
  * two products. The active product comes from the path, a query flag, or
  * the <html data-product> attribute.
  */
-export const VERSION = "1.0.0";
+export const VERSION = "1.0.1";
 
 export function productId() {
   try {

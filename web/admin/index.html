@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/app.css" />
+  <link rel="stylesheet" href="../css/app.css?v=20261114dlux" />
 </head>
 <body class="auth-page">
   <div class="page-tabs">
@@ -62,13 +62,13 @@
       </section>
       <section class="admin-panel" id="feedbackPanel">
         <h2>Feedback</h2>
-        <p class="lead">Messages sent from Account Settings. Toggle a note to mark it read or unread.</p>
+        <p class="lead">Messages sent from Account Settings, including Request access notes from Drone Locator. Toggle a note to mark it read or unread.</p>
         <div id="feedbackList" class="mission-list"></div>
       </section>
     </div>
   </main>
   <script type="module">
-    import { initAuthChrome, isAdmin, isAuthenticated, listUsers, setMosaicEnabled, setPhotoLimits, listFeedback, setFeedbackRead, getAdminProcessing, plannerHref } from "../js/auth.js";
+    import { initAuthChrome, isAdmin, isAuthenticated, listUsers, setMosaicEnabled, setPhotoLimits, listFeedback, setFeedbackRead, getAdminProcessing, plannerHref } from "../js/auth.js?v=20261114dlux";
     await initAuthChrome();
     if (!isAuthenticated()) location.replace(plannerHref("login"));
     else if (!isAdmin()) {
@@ -304,7 +304,10 @@
             const when = it.created_at ? new Date(Number(it.created_at) * 1000).toLocaleString() : "";
             const cls = it.is_read ? "" : " is-unread";
             const label = it.is_read ? "Mark unread" : "Mark read";
-            return `<div class="feedback-item${cls}"><div class="meta"><strong>${it.username}</strong> · ${when}</div><div>${String(it.message || "").replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}</div><button type="button" data-fb="${it.id}" data-read="${it.is_read ? "0" : "1"}">${label}</button></div>`;
+            const access = String(it.message || "").startsWith("ACCESS REQUEST:");
+            const badge = access ? ' <span class="feedback-badge">Access request</span>' : "";
+            const accessCls = access ? " is-access-request" : "";
+            return `<div class="feedback-item${cls}${accessCls}"><div class="meta"><strong>${it.username}</strong>${badge} · ${when}</div><div>${String(it.message || "").replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}</div><button type="button" data-fb="${it.id}" data-read="${it.is_read ? "0" : "1"}">${label}</button></div>`;
           }).join("");
         } catch (err) {
           box.innerHTML = `<p class="note">${err.message || "Feedback is not available on this API yet."}</p>`;

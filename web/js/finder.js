@@ -2,7 +2,6 @@
  * Find My Drone — upload a mosaic once, send a query (region or photo)
  * to the server matcher, and draw the returned boxes / GPS points.
  */
-import { getLatestSurveyMap } from "./survey-map.js";
 import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js";
 import { setPageTab, onPageTab } from "./tabs.js";
 import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js";
@@ -26,6 +25,7 @@ const state = {
   matchLayer: null,
   queryLayer: null,
   locateMarker: null,
+  drawMode: false,
 };
 
 function el(id) {
@@ -36,14 +36,47 @@ function apiBase() {
   return authApiBase();
 }
 
+const FINDER_DOWN = "The finder is down right now. Try again in a few minutes.";
+const DEFAULT_REF_STATUS = "On a phone, tap Draw box, then drag on the map. On a computer, tap Draw box or hold Shift and drag. Or upload a close-up photo of your drone or a marking on it.";
+
+function logTechnical(err, context) {
+  try {
+    console.error(context || "Drone Locator", err);
+  } catch {
+    /* ignore */
+  }
+}
+
+function friendlyError(err, fallback = FINDER_DOWN) {
+  const raw = err && (err.message || String(err));
+  logTechnical(err, "Drone Locator");
+  if (!raw) return fallback;
+  const lower = raw.toLowerCase();
+  if (/sign in|log in|not authenticated|401/.test(lower)) return "Sign in to use Drone Locator.";
+  if (/locked|403|enable mapping|enable drone locator/.test(lower)) return lockMessage().body;
+  if (/four numbers|west, south/.test(lower)) {
+    return "The area corners need four numbers: west, south, east, and north.";
+  }
+  if (/upload failed|could not encode/.test(lower)) {
+    return "Could not load that map. Try a different file, or try again in a few minutes.";
+  }
+  if (/match failed|search cannot start|matcher service/.test(lower)) return FINDER_DOWN;
+  if (/http \d+/.test(lower) || /127\.0\.0\.1|localhost|\/drone-mapper\/api/.test(lower)) return fallback;
+  if (raw.length < 160 && !/https?:\/\//i.test(raw) && !/\b\d{3}\b/.test(raw)) return raw;
+  return fallback;
+}
+
 async function readApiError(res, fallback) {
+  let detail = "";
   try {
     const body = await res.json();
-    if (body && body.detail) return body.detail;
+    if (body && body.detail) detail = String(body.detail);
   } catch {}
+  const technical = detail || `HTTP ${res.status}`;
+  logTechnical(technical, "Drone Locator API");
   if (res.status === 403) return lockMessage().body;
-  if (res.status === 401) return "Sign in to use Find My Drone.";
-  return fallback || `HTTP ${res.status}`;
+  if (res.status === 401) return "Sign in to use Drone Locator.";
+  return friendlyError(new Error(technical), fallback || FINDER_DOWN);
 }
 
 function setBox(id, msg) {
@@ -80,11 +113,8 @@ async function probeApi() {
     state.apiOk = !!body.ok;
   } catch (err) {
     state.apiOk = false;
-    setWarn(
-      "The matcher service is not running. Matching happens on the server " +
-      `(${state.apiBase}), not in the browser, so this tab will work once ` +
-      "the Find API is live. Nothing has been changed on the public site yet."
-    );
+    logTechnical(err, `Finder health check (${state.apiBase})`);
+    setWarn(FINDER_DOWN);
   }
   return state.apiOk;
 }
@@ -93,7 +123,7 @@ function parseBounds(text) {
   if (!text || !text.trim()) return null;
   const parts = text.split(/[, ]+/).map((s) => s.trim()).filter(Boolean).map(Number);
   if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) {
-    throw new Error("Bounds must be four numbers: west, south, east, north.");
+    throw new Error("The area corners need four numbers: west, south, east, and north.");
   }
   const [west, south, east, north] = parts;
   return { west, south, east, north };
@@ -272,7 +302,7 @@ function clearQuery({ keepStatus = false } = {}) {
     preview.innerHTML = "";
   }
   if (!keepStatus) {
-    setRefStatus("Click and drag a region on the mosaic, or upload a close-up of the aircraft or a marking.");
+    setRefStatus(DEFAULT_REF_STATUS);
   }
   redrawOverlay();
   enableSearch();
@@ -298,9 +328,9 @@ async function uploadMosaic(file, bounds) {
     throw new Error(lockMessage().body);
   }
   if (state.apiOk === false) {
-    throw new Error("The matcher service is not running.");
+    throw new Error(FINDER_DOWN);
   }
-  setProgress("Uploading mosaic to the matcher…");
+  setProgress("Uploading your search map…");
   const fd = new FormData();
   fd.append("file", file, file.name || "mosaic.jpg");
   if (bounds) {
@@ -311,19 +341,22 @@ async function uploadMosaic(file, bounds) {
   }
   const r = await apiFetch("/mosaics", { method: "POST", body: fd });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.detail || `Upload failed (${r.status})`);
+  if (!r.ok) {
+    logTechnical(body.detail || `Upload failed (${r.status})`, "map upload");
+    throw new Error(body.detail || "Could not load that map. Try a different file, or try again in a few minutes.");
+  }
   state.mosaicId = body.id;
   state.mosaicMeta = body;
   state.matches = [];
   const geo = body.georeferenced
-    ? `georeferenced` + (body.bounds ? ` (${body.bounds.west.toFixed(5)}, ${body.bounds.south.toFixed(5)})–(${body.bounds.east.toFixed(5)}, ${body.bounds.north.toFixed(5)})` : "")
-    : "not georeferenced — add bounds above and re-upload if you want GPS";
+    ? "location data included" + (body.bounds ? ` (${body.bounds.west.toFixed(5)}, ${body.bounds.south.toFixed(5)})–(${body.bounds.east.toFixed(5)}, ${body.bounds.north.toFixed(5)})` : "")
+    : "no location data — add the area corners under More options and upload again if you want walking directions";
   setMosaicStatus(
-    `Mosaic “${body.filename}” uploaded — ${body.width}×${body.height} px, ${geo}. ` +
-    `It will expire automatically; later searches reuse this id so the file is not sent again.`
+    `“${body.filename}” is on the server — ${body.width}×${body.height} px, ${geo}. ` +
+    `Later searches reuse this map so the file is not sent again.`
   );
   if (body.bounds) fillBoundsInput(body.bounds);
-  setProgress("Mosaic is on the server. Draw a query region or upload a reference, then search.");
+  setProgress("The map is on the server. Draw a box or upload a photo of your drone, then search.");
   enableSearch();
   syncFindMap();
   return body;
@@ -368,28 +401,8 @@ async function onMosaicFile(file) {
       if (!w) setWarn(err.message);
     }
   } catch (err) {
-    setError(err.message);
-    setProgress("Upload failed.");
-  }
-  redrawOverlay();
-}
-
-async function useLatestSurveyMap() {
-  setError("");
-  const packed = getLatestSurveyMap();
-  if (!packed || !packed.canvas) {
-    setError("No survey map is ready yet. Upload a mosaic here, or use a survey map already on this account.");
-    return;
-  }
-  const blob = await canvasToBlob(packed.canvas, "image/png");
-  const file = new File([blob], packed.name || "mosaic-ortho.png", { type: "image/png" });
-  if (packed.bounds) fillBoundsInput(packed.bounds);
-  state.mosaicMeta = { width: packed.width, height: packed.height };
-  await drawFilePreview(file, packed.width, packed.height);
-  try {
-    await uploadMosaic(file, packed.bounds || boundsFromInput());
-  } catch (err) {
-    setError(err.message);
+    setError(friendlyError(err, "Could not load that map. Try a different file, or try again in a few minutes."));
+    setProgress("The map did not upload. Try again in a few minutes.");
   }
   redrawOverlay();
 }
@@ -399,7 +412,7 @@ async function onRefFile(file) {
   clearQuery({ keepStatus: true });
   state.queryFile = file;
   state.queryUrl = URL.createObjectURL(file);
-  showRefPreview(state.queryUrl, `Reference “${file.name}” will be sent with the next search. The mosaic stays on the server.`);
+  showRefPreview(state.queryUrl, `“${file.name}” will be used in the next search. Your map stays on the server.`);
   enableSearch();
   if (document.getElementById("viewFind") && !document.getElementById("viewFind").hidden) {
     ensureFindMap();
@@ -409,16 +422,16 @@ async function onRefFile(file) {
 async function runSearch() {
   setError("");
   if (!state.apiOk) {
-    setError("The matcher service is not running, so the search cannot start.");
+    setError(FINDER_DOWN);
     return;
   }
   if (!state.mosaicId) {
-    setError("Load a mosaic first.");
+    setError("Load a search map first.");
     return;
   }
   const btn = el("btnFindSearch");
   if (btn) btn.disabled = true;
-  setProgress("Searching the mosaic on the server… this can take a while on a large orthophoto.");
+  setProgress("Searching the map on the server… a large map can take a little while.");
   const fd = new FormData();
   fd.append("top_n", "8");
   const useColor = el("findMatchColor") ? el("findMatchColor").checked : true;
@@ -456,7 +469,7 @@ async function runSearch() {
     fd.append("w", String(r.w));
     fd.append("h", String(r.h));
   } else {
-    setError("Draw a region or upload a reference photo first.");
+    setError("Draw a box on the map or upload a photo of your drone first.");
     enableSearch();
     return;
   }
@@ -464,7 +477,10 @@ async function runSearch() {
   try {
     const r = await apiFetch(`/mosaics/${state.mosaicId}/match`, { method: "POST", body: fd });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.detail || `Match failed (${r.status})`);
+    if (!r.ok) {
+      logTechnical(body.detail || `Match failed (${r.status})`, "search");
+      throw new Error(body.detail || FINDER_DOWN);
+    }
     let matches = Array.isArray(body.matches) ? body.matches : [];
     // If the query was a crop of this mosaic, hide the exact region itself.
     if (state.queryRect && !state.queryFile) {
@@ -476,9 +492,9 @@ async function runSearch() {
     renderNavigate();
     const dt = ((performance.now() - t0) / 1000).toFixed(1);
     if (!matches.length) {
-      setProgress(`No matches above the threshold (${dt}s). Try a tighter region or a clearer reference.`);
+      setProgress(`No close matches (${dt}s). Try drawing a tighter box or using a clearer photo of your drone.`);
     } else {
-      setProgress(`Found ${matches.length} match${matches.length === 1 ? "" : "es"} in ${dt}s. Boxes are drawn on the mosaic.`);
+      setProgress(`Found ${matches.length} match${matches.length === 1 ? "" : "es"} in ${dt}s. Boxes are drawn on the map.`);
     }
     renderResults();
     redrawOverlay();
@@ -496,8 +512,8 @@ async function runSearch() {
       });
     }
   } catch (err) {
-    setError(err.message);
-    setProgress("Search failed.");
+    setError(friendlyError(err, FINDER_DOWN));
+    setProgress("The search did not finish. Try again in a few minutes.");
   } finally {
     enableSearch();
   }
@@ -524,7 +540,7 @@ function renderResults() {
     const p = document.createElement("p");
     p.className = "note";
     p.textContent = state.queryRect && !state.queryFile
-      ? "Only the region you selected matched. That usually means the marking is not repeated elsewhere on this mosaic."
+      ? "Only the area you marked matched. That usually means the marking is not repeated elsewhere on this map."
       : "No matches yet.";
     box.appendChild(p);
     return;
@@ -541,7 +557,7 @@ function renderResults() {
     const scoreCls = m.score >= 0.6 ? "score" : "score is-low";
     const gps = (Number.isFinite(m.lat) && Number.isFinite(m.lon))
       ? `<div>${m.lat.toFixed(6)}, ${m.lon.toFixed(6)} · <a href="${mapsUrl(m.lat, m.lon)}" target="_blank" rel="noopener">Google Maps</a></div>`
-      : `<div>No GPS — the mosaic is not georeferenced.</div>`;
+      : `<div>No walking directions — this map has no location data.</div>`;
     meta.innerHTML =
       `<strong>#${i + 1} <span class="${scoreCls}">${(m.score * 100).toFixed(0)}%</span> ${escapeHtml(m.method || "")}</strong>` +
       `<div>${m.w.toFixed(0)}×${m.h.toFixed(0)} px at (${m.x.toFixed(0)}, ${m.y.toFixed(0)})</div>` +
@@ -603,20 +619,132 @@ function highlightMatch(i) {
   }
 }
 
+function finishRegionDrag() {
+  const r = state.queryRect;
+  state.drag = null;
+  if (!r || r.w < 8 || r.h < 8) {
+    state.queryRect = null;
+    setRefStatus("Draw a larger box, or upload a photo of your drone.");
+  } else {
+    setRefStatus("Area marked. Tap Search to look for similar spots on the map.");
+  }
+  enableSearch();
+  redrawOverlay();
+}
+
+function applyRegionFromPoints(x0, y0, x1, y1) {
+  state.queryRect = normRect(x0, y0, x1, y1);
+  if (state.queryFile) {
+    state.queryFile = null;
+    if (state.queryUrl) URL.revokeObjectURL(state.queryUrl);
+    state.queryUrl = null;
+    const preview = el("refPreview");
+    if (preview) { preview.hidden = true; preview.innerHTML = ""; }
+  }
+  redrawOverlay();
+}
+
 function bindStageDrag() {
   const canvas = el("findCanvas");
-  if (!canvas) return;
+  if (!canvas || canvas.dataset.drawBound) return;
+  canvas.dataset.drawBound = "1";
+  const startDrag = (ev) => {
+    if (!state.mosaicMeta) return;
+    if (ev.pointerType === "mouse" && ev.button !== 0) return;
+    ev.preventDefault();
+    try { canvas.setPointerCapture(ev.pointerId); } catch { /* */ }
+    const p = eventToMosaicPx(ev);
+    state.drag = { x: p.x, y: p.y, pointerId: ev.pointerId };
+  };
+  const moveDrag = (ev) => {
+    if (!state.drag) return;
+    ev.preventDefault();
+    const p = eventToMosaicPx(ev);
+    applyRegionFromPoints(state.drag.x, state.drag.y, p.x, p.y);
+  };
+  const endDrag = (ev) => {
+    if (!state.drag) return;
+    if (ev && state.drag.pointerId != null && ev.pointerId !== state.drag.pointerId) return;
+    finishRegionDrag();
+  };
+  canvas.addEventListener("pointerdown", startDrag);
+  canvas.addEventListener("pointermove", moveDrag);
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  // Mouse fallback for older browsers that still fire mouse events only.
   canvas.addEventListener("mousedown", (ev) => {
+    if (window.PointerEvent) return;
     if (!state.mosaicMeta) return;
     ev.preventDefault();
     const p = eventToMosaicPx(ev);
     state.drag = { x: p.x, y: p.y };
   });
   window.addEventListener("mousemove", (ev) => {
-    if (!state.drag) return;
+    if (window.PointerEvent || !state.drag) return;
     const p = eventToMosaicPx(ev);
-    state.queryRect = normRect(state.drag.x, state.drag.y, p.x, p.y);
-    // A new region query replaces a previously uploaded reference.
+    applyRegionFromPoints(state.drag.x, state.drag.y, p.x, p.y);
+  });
+  window.addEventListener("mouseup", () => {
+    if (window.PointerEvent || !state.drag) return;
+    finishRegionDrag();
+  });
+}
+
+function setDrawMode(on) {
+  state.drawMode = !!on;
+  const btn = el("btnDrawQuery");
+  if (btn) {
+    btn.setAttribute("aria-pressed", state.drawMode ? "true" : "false");
+  }
+  const host = el("findMap");
+  const wrap = host && host.closest(".find-map-wrap");
+  if (host) host.classList.toggle("is-draw-mode", state.drawMode);
+  if (wrap) wrap.classList.toggle("is-draw-mode", state.drawMode);
+  const map = state.map;
+  if (!map) return;
+  if (state.drawMode) {
+    map.dragging.disable();
+    if (map.boxZoom) map.boxZoom.disable();
+    if (map.tap && map.tap.disable) map.tap.disable();
+    if (map.touchZoom) map.touchZoom.disable();
+    if (map.doubleClickZoom) map.doubleClickZoom.disable();
+  } else {
+    map.dragging.enable();
+    if (map.boxZoom) map.boxZoom.enable();
+    if (map.tap && map.tap.enable) map.tap.enable();
+    if (map.touchZoom) map.touchZoom.enable();
+    if (map.doubleClickZoom) map.doubleClickZoom.enable();
+  }
+}
+
+function bindMapDraw(map) {
+  const host = el("findMap");
+  if (!host || host.dataset.drawBound) return;
+  host.dataset.drawBound = "1";
+  let startLatLng = null;
+
+  const eventLatLng = (ev) => {
+    if (!state.map) return null;
+    return state.map.mouseEventToLatLng(ev);
+  };
+
+  const paintBox = (a, b) => {
+    if (!state.queryLayer || !a || !b) return;
+    const sw = [Math.min(a.lat, b.lat), Math.min(a.lng, b.lng)];
+    const ne = [Math.max(a.lat, b.lat), Math.max(a.lng, b.lng)];
+    state.queryLayer.clearLayers();
+    L.rectangle([sw, ne], { color: "#e05a5a", weight: 2, fillOpacity: 0.08 }).addTo(state.queryLayer);
+  };
+
+  const commitBox = (a, b) => {
+    startLatLng = null;
+    const p0 = latLngToMosaicPx(a);
+    const p1 = latLngToMosaicPx(b);
+    if (!p0 || !p1) return;
+    const x = Math.min(p0.x, p1.x), y = Math.min(p0.y, p1.y);
+    const w = Math.abs(p1.x - p0.x), h = Math.abs(p1.y - p0.y);
+    if (w < 4 || h < 4) return;
+    state.queryRect = { x, y, w, h };
     if (state.queryFile) {
       state.queryFile = null;
       if (state.queryUrl) URL.revokeObjectURL(state.queryUrl);
@@ -624,20 +752,52 @@ function bindStageDrag() {
       const preview = el("refPreview");
       if (preview) { preview.hidden = true; preview.innerHTML = ""; }
     }
-    redrawOverlay();
-  });
-  window.addEventListener("mouseup", () => {
-    if (!state.drag) return;
-    state.drag = null;
-    const r = state.queryRect;
-    if (!r || r.w < 8 || r.h < 8) {
-      state.queryRect = null;
-      setRefStatus("Drag a larger region (at least 8×8 px) or upload a reference photo.");
-    } else {
-      setRefStatus(`Query region ${r.w.toFixed(0)}×${r.h.toFixed(0)} px at (${r.x.toFixed(0)}, ${r.y.toFixed(0)}). Other instances of this patch will be ranked.`);
-    }
     enableSearch();
     redrawOverlay();
+    setRefStatus("Area marked. Tap Search to look for similar spots on the map.");
+    setDrawMode(false);
+  };
+
+  host.addEventListener("pointerdown", (ev) => {
+    const isMouse = ev.pointerType === "mouse" || ev.pointerType === "";
+    const allow = state.drawMode || (isMouse && ev.shiftKey && ev.button === 0);
+    if (!allow) return;
+    if (!mosaicBounds()) return;
+    if (ev.target && ev.target.closest && ev.target.closest(".leaflet-control")) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    try { host.setPointerCapture(ev.pointerId); } catch { /* */ }
+    startLatLng = eventLatLng(ev);
+    if (state.drawMode && state.map) state.map.dragging.disable();
+  });
+  host.addEventListener("pointermove", (ev) => {
+    if (!startLatLng) return;
+    ev.preventDefault();
+    paintBox(startLatLng, eventLatLng(ev));
+  });
+  host.addEventListener("pointerup", (ev) => {
+    if (!startLatLng) return;
+    ev.preventDefault();
+    commitBox(startLatLng, eventLatLng(ev));
+  });
+  host.addEventListener("pointercancel", () => { startLatLng = null; });
+
+  // Keep the original Leaflet mouse path as a backup when PointerEvent is missing.
+  let dragStart = null;
+  map.on("mousedown", (ev) => {
+    if (window.PointerEvent) return;
+    if (!mosaicBounds() || ev.originalEvent.shiftKey || ev.originalEvent.button !== 0) return;
+    dragStart = ev.latlng;
+  });
+  map.on("mousemove", (ev) => {
+    if (window.PointerEvent || !dragStart) return;
+    paintBox(dragStart, ev.latlng);
+  });
+  map.on("mouseup", (ev) => {
+    if (window.PointerEvent || !dragStart) return;
+    const a = dragStart;
+    dragStart = null;
+    commitBox(a, ev.latlng);
   });
 }
 
@@ -694,7 +854,7 @@ async function loadDemo() {
   if (state.apiOk === false) {
     const still = await probeApi();
     if (!still) {
-      setError("Demo needs the matcher service running on this machine (default http://127.0.0.1:8091).");
+      setError(FINDER_DOWN);
       return;
     }
   }
@@ -711,14 +871,13 @@ async function loadDemo() {
     await uploadMosaic(file, demo.bounds);
     state.queryRect = demo.query;
     setRefStatus(
-      `Demo query is a padded crop of the yellow marking at (${demo.query.x}, ${demo.query.y}). ` +
-        "A second, slightly rotated copy sits elsewhere on the mosaic."
+      "Demo is ready: a yellow marking is boxed on the map. A second, slightly rotated copy sits elsewhere so you can try Search."
     );
     enableSearch();
     redrawOverlay();
     await runSearch();
   } catch (err) {
-    setError(err.message);
+    setError(friendlyError(err, FINDER_DOWN));
   }
 }
 
@@ -762,37 +921,8 @@ function ensureFindMap() {
   attachBasemap(map, { locate: false });
   state.matchLayer = L.layerGroup().addTo(map);
   state.queryLayer = L.layerGroup().addTo(map);
-  let dragStart = null;
-  map.on("mousedown", (ev) => {
-    if (!mosaicBounds() || ev.originalEvent.shiftKey || ev.originalEvent.button !== 0) return;
-    // Draw a query region only when the pointer is on the ortho.
-    dragStart = ev.latlng;
-  });
-  map.on("mousemove", (ev) => {
-    if (!dragStart) return;
-    const a = dragStart;
-    const b = ev.latlng;
-    const sw = [Math.min(a.lat, b.lat), Math.min(a.lng, b.lng)];
-    const ne = [Math.max(a.lat, b.lat), Math.max(a.lng, b.lng)];
-    state.queryLayer.clearLayers();
-    L.rectangle([sw, ne], { color: "#f0a202", weight: 2, fillOpacity: 0.08 }).addTo(state.queryLayer);
-  });
-  map.on("mouseup", (ev) => {
-    if (!dragStart) return;
-    const a = dragStart;
-    dragStart = null;
-    const p0 = latLngToMosaicPx(a);
-    const p1 = latLngToMosaicPx(ev.latlng);
-    if (!p0 || !p1) return;
-    const x = Math.min(p0.x, p1.x), y = Math.min(p0.y, p1.y);
-    const w = Math.abs(p1.x - p0.x), h = Math.abs(p1.y - p0.y);
-    if (w < 4 || h < 4) return;
-    state.queryRect = { x, y, w, h };
-    enableSearch();
-    redrawOverlay();
-    setRefStatus("Query region set on the map. Press Search mosaic.");
-  });
   state.map = map;
+  bindMapDraw(map);
   locateOrFallback(map, {
     onLocated: ({ lat, lon }) => {
       if (state.locateMarker) state.map.removeLayer(state.locateMarker);
@@ -895,7 +1025,7 @@ export async function initFinder() {
     ev.target.value = "";
     if (file) onMosaicFile(file);
   });
-  el("btnUseOrtho")?.addEventListener("click", () => useLatestSurveyMap());
+  el("btnDrawQuery")?.addEventListener("click", () => setDrawMode(!state.drawMode));
   el("btnFindDemo")?.addEventListener("click", () => loadDemo());
   el("btnLoadRef")?.addEventListener("click", () => el("fileRef")?.click());
   el("fileRef")?.addEventListener("change", (ev) => {

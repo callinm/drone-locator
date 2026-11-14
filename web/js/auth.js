@@ -264,6 +264,8 @@ export async function setPhotoLimits(username, { photoCap, plan, clearPhotoCap }
   return body.user;
 }
 
+export const ACCESS_REQUEST_PREFIX = "ACCESS REQUEST:";
+
 export function lockMessage(feature) {
   const name = (feature || "").trim();
   const title = name ? `${name} is locked` : "Mapping is locked";
@@ -271,16 +273,44 @@ export function lockMessage(feature) {
     return {
       title,
       body: isLocator()
-        ? "Log in or create an account. Drone Locator stays locked until an admin enables mapping for your account."
-        : "Log in or create an account. Pile Count stays locked until an admin enables mapping for your account.",
+        ? "Log in or create an account. After you sign in, tap Request access so an admin can turn Drone Locator on for you."
+        : "Log in or create an account. Mapping stays locked until an admin turns it on for your account.",
     };
   }
   return {
     title,
     body: isLocator()
-      ? "This mapping feature is locked. Contact an admin to enable Drone Locator for your account."
-      : "This mapping feature is locked. Contact an admin to enable Pile Count for your account.",
+      ? "Your account is ready, but Drone Locator is not turned on yet. Tap Request access and an admin will review it. This does not turn it on by itself."
+      : "This feature is locked. An admin has to turn it on for your account.",
   };
+}
+
+function bindRequestAccess(root) {
+  const btn = root.querySelector("[data-lock-request]");
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+  btn.addEventListener("click", async () => {
+    const status = root.querySelector("[data-lock-request-status]");
+    btn.disabled = true;
+    if (status) {
+      status.hidden = false;
+      status.textContent = "Sending your request…";
+      status.className = "okbox";
+    }
+    try {
+      await sendFeedback(`${ACCESS_REQUEST_PREFIX} Please turn on Drone Locator for my account.`);
+      if (status) {
+        status.textContent = "Your request was sent. An admin will review it and turn on Drone Locator for your account.";
+      }
+      btn.textContent = "Request sent";
+    } catch (err) {
+      btn.disabled = false;
+      if (status) {
+        status.className = "errorbox";
+        status.textContent = err.message || "Could not send the request. Try again in a few minutes.";
+      }
+    }
+  });
 }
 
 export function applyMosaicLock() {
@@ -297,6 +327,9 @@ export function applyMosaicLock() {
     const signup = el.querySelector("[data-lock-signup]");
     if (login) login.hidden = !!state.user;
     if (signup) signup.hidden = !!state.user;
+    const request = el.querySelector("[data-lock-request]");
+    if (request) request.hidden = !(state.user && locked);
+    bindRequestAccess(el);
   });
   document.querySelectorAll("[data-requires-mosaic]").forEach((el) => {
     if ("disabled" in el) el.disabled = locked;

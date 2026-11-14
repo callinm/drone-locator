@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/app.css" />
+  <link rel="stylesheet" href="../css/app.css?v=20261114dlux" />
 </head>
 <body class="auth-page">
   <div class="page-tabs">
@@ -20,7 +20,7 @@
   <main class="auth-main">
     <form class="auth-card" id="signupForm" autocomplete="off">
       <h1>Create an account</h1>
-      <p class="lead">No invite code needed. New accounts start blank, pictures stay private, and mapping stays locked until an admin enables it for your account.</p>
+      <p class="lead">No invite code needed. New accounts start blank and pictures stay private. After you sign up, tap Request access on the home page so an admin can turn Drone Locator on for you.</p>
       <div class="error" id="error" hidden></div>
       <label class="field">
         <span class="lbl">Username</span>
@@ -43,11 +43,11 @@
     applyProductChrome();
     const lead = document.querySelector("p.lead");
     if (lead && isLocator()) {
-      lead.textContent = "No invite code needed. New accounts start blank, pictures stay private, and Drone Locator stays locked until an admin enables mapping for your account.";
+      lead.textContent = "No invite code needed. New accounts start blank and pictures stay private. After you sign up, tap Request access on the home page so an admin can turn Drone Locator on for you.";
       document.title = "Create an account — Drone Locator";
     }
 
-    import { initAuthChrome, isAuthenticated, signup, plannerHref } from "../js/auth.js";
+    import { initAuthChrome, isAuthenticated, signup, plannerHref } from "../js/auth.js?v=20261114dlux";
     await initAuthChrome();
     if (isAuthenticated()) location.replace(plannerHref("home"));
     const form = document.getElementById("signupForm");
@@ -70,6 +70,6 @@
       }
     });
   </script>
-  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.0</footer>
+  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.1</footer>
 </body>
 </html>

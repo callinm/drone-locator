@@ -1,4 +1,5 @@
 import { isLocator, productName } from "./product.js";
+import { isMosaicEnabled } from "./auth.js";
 /**
  * First-run guided tour: a pop-up bubble, a spotlight, and an arrow
  * pointing at the control to click. Completion is stored locally and
@@ -78,43 +79,74 @@ export const LOCATOR_STEPS = Object.freeze([
   {
     id: "welcome",
     title: "Welcome to Drone Locator",
-    body: "Search a stitched map for a lost aircraft. This short tour covers only the locator steps.",
+    body: "Search a map of the area for a lost aircraft. This short tour covers the locator steps.",
     target: null,
     cta: "Start the tour",
   },
   {
     id: "signin",
     title: "Sign in",
-    body: "Log in or sign up so your mosaics and search results stay with your account.",
+    body: "Log in or sign up so your maps and search results stay with your account.",
     target: "authChrome",
   },
   {
     id: "load-map",
-    title: "Load a survey map",
-    body: "Load a mosaic or orthophoto, or use the latest survey map if one is already on this account. The map should show satellite tiles and your survey on top, centered on your location or the mosaic area.",
+    title: "Load a search map",
+    body: "Tap Load a search map and choose a stitched photo of the ground where you flew. The map should show that photo on top of the satellite view.",
     target: "btnLoadMosaic",
     tab: "find",
   },
   {
     id: "query",
-    title: "Set a query",
-    body: "Draw a region on the map, or upload a close-up of the aircraft or a marking, so the search knows what to look for.",
-    target: "btnLoadRef",
+    title: "Show us your drone",
+    body: "On a phone, tap Draw box, then drag on the map. Or upload a close-up photo of your drone or a marking on it.",
+    target: "btnDrawQuery",
     tab: "find",
   },
   {
     id: "search",
     title: "Search",
-    body: "Turn on Match color if you know the paint color, then tap Search mosaic. Matches appear as numbered pins with a confidence percent.",
+    body: "Turn on “Look for this color” if you know the paint color, then tap Search. Matches appear as numbered pins with a score.",
     target: "btnFindSearch",
     tab: "find",
   },
   {
     id: "navigate",
     title: "Navigate here",
-    body: "The top match gets a Navigate here link. Open it to get directions to that GPS point.",
+    body: "The top match gets a Navigate here button on the map. Open it to get walking directions to that point.",
     target: "findNavigate",
     tab: "find",
+    keepIfMissing: true,
+  },
+  {
+    id: "settings",
+    title: "Settings and this tutorial",
+    body: "Account Settings is where you change your password, send feedback, or delete only your own account. Replay this tutorial from Show tutorial at any time.",
+    target: "btnShowTutorial",
+    finish: true,
+    cta: "Finish",
+  },
+]);
+
+export const LOCATOR_LOCKED_STEPS = Object.freeze([
+  {
+    id: "welcome",
+    title: "Welcome to Drone Locator",
+    body: "This site helps you search a map of the area for a lost aircraft. You need an account, and an admin has to turn it on for you first.",
+    target: null,
+    cta: "Start the tour",
+  },
+  {
+    id: "signin",
+    title: "Sign in or request access",
+    body: "Log in or create an account at the top of the page. After you sign in, tap Request access on this screen so an admin can turn Drone Locator on for you.",
+    target: "locatorLockCard",
+  },
+  {
+    id: "how-it-works",
+    title: "How a search works",
+    body: "Once it is turned on: load a stitched map of the search area, show us your drone by drawing a box or uploading a photo, tap Search, then use Navigate here to walk to the top match.",
+    target: null,
   },
   {
     id: "settings",
@@ -127,7 +159,13 @@ export const LOCATOR_STEPS = Object.freeze([
 ]);
 
 export function steps() {
-  return isLocator() ? LOCATOR_STEPS : PILETALLY_STEPS;
+  if (!isLocator()) return PILETALLY_STEPS;
+  try {
+    if (!isMosaicEnabled()) return LOCATOR_LOCKED_STEPS;
+  } catch {
+    return LOCATOR_LOCKED_STEPS;
+  }
+  return LOCATOR_STEPS;
 }
 
 /** @deprecated use steps() — kept so older imports do not break */
@@ -287,6 +325,7 @@ export function layoutTourChrome(host, targetId) {
  * Welcome-style steps with no target stay put.
  */
 export function shouldAdvancePastMissingTarget(step, layoutResult) {
+  if (step && step.keepIfMissing) return false;
   return !!(step && step.target && layoutResult && layoutResult.reason === "no-target");
 }
 
@@ -303,10 +342,43 @@ export function nextIndexAfterMissingTarget(startIndex, list) {
     const nxt = nextIndex(i, seq.length);
     if (nxt === i) return i;
     const step = seq[nxt];
-    if (!step.target || step.tab || targetIsVisible(step.target)) return nxt;
+    if (!step.target || step.keepIfMissing || step.tab || targetIsVisible(step.target)) return nxt;
     i = nxt;
   }
   return i;
+}
+
+
+function prepareNavigateDemo(step) {
+  const bar = document.getElementById("findNavigate");
+  if (!bar) return;
+  if (step && step.id === "navigate") {
+    if (bar.hidden) {
+      bar.hidden = false;
+      bar.dataset.tutorialDemo = "1";
+      const link = document.getElementById("findNavigateLink");
+      if (link && !link.getAttribute("href")) {
+        link.href = "https://www.google.com/maps";
+        link.textContent = "Navigate here";
+      }
+      const meta = document.getElementById("findNavigateMeta");
+      if (meta && !meta.textContent) {
+        meta.textContent = "Example: this button opens walking directions to the top match.";
+      }
+    }
+    return;
+  }
+  clearNavigateDemo();
+}
+
+function clearNavigateDemo() {
+  const bar = document.getElementById("findNavigate");
+  if (bar && bar.dataset.tutorialDemo === "1") {
+    bar.hidden = true;
+    delete bar.dataset.tutorialDemo;
+    const meta = document.getElementById("findNavigateMeta");
+    if (meta) meta.textContent = "";
+  }
 }
 
 function paintStep(host, index, hooks) {
@@ -330,6 +402,7 @@ function paintStep(host, index, hooks) {
     </div>
   `;
   if (step.tab) hooks.setPageTab?.(step.tab);
+  prepareNavigateDemo(step);
   const layout = () => layoutTourChrome(host, step.target);
   layout();
   requestAnimationFrame(layout);
@@ -371,6 +444,7 @@ export function initTutorial({
   function close() {
     running = false;
     stopTracking();
+    clearNavigateDemo();
     host.hidden = true;
     host.innerHTML = "";
   }
@@ -431,7 +505,7 @@ export function initTutorial({
       const step = steps()[index];
       if (step.finish || index >= steps().length - 1) {
         close();
-        setPageTab?.("planner");
+        setPageTab?.(isLocator() ? "find" : "planner");
         try {
           await persist("completed");
         } catch {
