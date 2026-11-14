@@ -3,7 +3,7 @@ import {
   formatDistance,
 } from "./units.js";
 import { parseMissionJson } from "./export.js";
-import { isAuthenticated, onAuthChange } from "./auth.js";
+import { isAuthenticated, onAuthChange } from "./auth.js?v=20261114fix2";
 import {
   deleteMission as syncDeleteMission,
   enqueue,

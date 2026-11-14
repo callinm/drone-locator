@@ -51,7 +51,7 @@ import {
   mphToMps,
   mpsToMph,
 } from "./units.js";
-import { initTutorial } from "./tutorial.js?v=20261114dlux3";
+import { initTutorial } from "./tutorial.js?v=20261114fix2";
 import { attachBasemap, refreshMapSize } from "./basemap.js";
 import { evaluatePhotoCount, isStockpileMission } from "./photolimits.js";
 import { initPageTabs, setPageTab, onPageTab } from "./tabs.js";
@@ -66,7 +66,7 @@ import {
   suggestedFilename,
 } from "./export.js";
 import { initSavedMissions } from "./saved-missions.js";
-import { initAuthChrome, isAuthenticated, onAuthChange, currentUser } from "./auth.js?v=20261114dlux3";
+import { initAuthChrome, isAuthenticated, onAuthChange, currentUser } from "./auth.js?v=20261114fix2";
 import { enqueue, getSettings, putSettings, readCache, writeCache } from "./sync.js";
 
 // Public University of Illinois South Farms — demo only, not a real mission.
@@ -583,7 +583,7 @@ syncDroneSelect();
 initAuthChrome();
 (async () => {
   if (isLocator()) {
-    const { initFinder } = await import("./finder.js?v=20261114dlux3");
+    const { initFinder } = await import("./finder.js?v=20261114fix2");
     initFinder();
   } else {
     const { initStockpile } = await import("./stockpile.js?v=20261113y");

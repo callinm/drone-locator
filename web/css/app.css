@@ -20,6 +20,8 @@
 }
 
 * { box-sizing: border-box; }
+/* hidden wins over later display:flex / inline-flex rules */
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
 
 body {

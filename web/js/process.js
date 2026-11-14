@@ -1,6 +1,6 @@
 /** Survey-quality processing UI helpers. Status comes from find-api only. */
 
-import { apiFetch, apiBase, requestAuthHeaders } from "./auth.js";
+import { apiFetch, apiBase, requestAuthHeaders } from "./auth.js?v=20261114fix2";
 import {
   registerXhr,
   clearXhr,

@@ -1,5 +1,5 @@
 import { isLocator, productName } from "./product.js";
-import { isMosaicEnabled } from "./auth.js";
+import { isMosaicEnabled } from "./auth.js?v=20261114fix2";
 /**
  * First-run guided tour: a pop-up bubble, a spotlight, and an arrow
  * pointing at the control to click. Completion is stored locally and

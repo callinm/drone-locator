@@ -4,7 +4,7 @@
  */
 import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js";
 import { setPageTab, onPageTab } from "./tabs.js";
-import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js";
+import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js?v=20261114fix2";
 import { enqueue, putFindResults } from "./sync.js";
 
 const MAX_PREVIEW = 2048;
