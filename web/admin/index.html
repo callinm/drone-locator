@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" data-product="locator">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Drone Locator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/app.css" />
+</head>
+<body class="auth-page">
+  <div class="page-tabs">
+    <div class="page-brand">
+      <strong><a href="../" style="color:inherit;text-decoration:none">Drone Locator</a></strong>
+      <span>Admin</span>
+    </div>
+  </div>
+  <main class="auth-main">
+    <div class="auth-card admin-wrap">
+      <h1>Admin</h1>
+      <section class="admin-panel" id="processingPanel">
+        <h2>Processing</h2>
+        <p class="lead">The running stitch job, the queue, and this server’s CPU, RAM, swap, and disk. Refreshes about every 10 seconds. Admin only.</p>
+        <div id="hostMeters" class="host-meters"></div>
+        <canvas id="hostHistory" class="host-history" width="640" height="64" aria-label="Last hour of CPU use"></canvas>
+        <p class="note" id="hostHistoryNote">History fills in over the last hour after the API is running this version.</p>
+        <div id="runningJob" class="mission-list"></div>
+        <h3 class="subhead">Queue</h3>
+        <div id="jobQueue" class="mission-list"></div>
+        <p class="note" id="webodmStatus"></p>
+      </section>
+      <section class="admin-panel">
+      <h2>Users</h2>
+      <p class="lead">Accounts on this site, with signup date, last login, and mapping access. Feature toggles below turn mapping on or off and set the photo cap. There is no password editing here. A Credits column is reserved for a future credit system and is not in use.</p>
+      <div class="admin-toolbar">
+        <label class="admin-search">Search
+          <input type="search" id="userSearch" placeholder="Username, email, plan…" autocomplete="off" />
+        </label>
+      </div>
+      <div class="error" id="error" hidden></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="userTable">
+          <thead>
+            <tr>
+              <th><button type="button" class="sort-btn" data-sort="username">Username</button></th>
+              <th><button type="button" class="sort-btn" data-sort="email">Email</button></th>
+              <th><button type="button" class="sort-btn" data-sort="created_at">Signed up</button></th>
+              <th><button type="button" class="sort-btn" data-sort="last_login">Last login</button></th>
+              <th>Features</th>
+              <th><button type="button" class="sort-btn" data-sort="job_count">Jobs</button></th>
+              <th><button type="button" class="sort-btn" data-sort="status">Status</button></th>
+              <th class="col-credits" title="Reserved for a future credit system">Credits</th>
+              <th>Photo cap</th>
+              <th>Plan</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      </section>
+      <section class="admin-panel" id="feedbackPanel">
+        <h2>Feedback</h2>
+        <p class="lead">Messages sent from Account Settings. Toggle a note to mark it read or unread.</p>
+        <div id="feedbackList" class="mission-list"></div>
+      </section>
+    </div>
+  </main>
+  <script type="module">
+    import { initAuthChrome, isAdmin, isAuthenticated, listUsers, setMosaicEnabled, setPhotoLimits, listFeedback, setFeedbackRead, getAdminProcessing, plannerHref } from "../js/auth.js";
+    await initAuthChrome();
+    if (!isAuthenticated()) location.replace(plannerHref("login"));
+    else if (!isAdmin()) {
+      document.getElementById("error").hidden = false;
+      document.getElementById("error").textContent = "Admin only.";
+      document.getElementById("userTable").hidden = true;
+    } else {
+      const error = document.getElementById("error");
+      const tbody = document.querySelector("#userTable tbody");
+      const search = document.getElementById("userSearch");
+      let sortKey = "username";
+      let sortDir = "asc";
+      const tz = "America/Chicago";
+
+      function fmtWhen(ts) {
+        if (!ts && ts !== 0) return "—";
+        const d = new Date(Number(ts) * 1000);
+        if (Number.isNaN(d.getTime())) return "—";
+        const text = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz, year: "numeric", month: "short", day: "numeric",
+          hour: "numeric", minute: "2-digit",
+        }).format(d);
+        return `${text} CST`;
+      }
+      function escapeHtml(s) {
+        return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      }
+      function features(u) {
+        const parts = [];
+        parts.push(u.mosaic_enabled ? "Mapping on" : "Mapping locked");
+        return parts.join(", ");
+      }
+      async function render() {
+        try {
+          const q = (search.value || "").trim();
+          const users = await listUsers({ q, sort: sortKey, direction: sortDir });
+          tbody.innerHTML = "";
+          if (!users.length) {
+            tbody.innerHTML = `<tr><td colspan="11" class="note">No users match that search.</td></tr>`;
+            return;
+          }
+          for (const u of users) {
+            const tr = document.createElement("tr");
+            const toggleLabel = u.mosaic_enabled ? "Turn off" : "Turn on";
+            const cap = Number(u.photo_cap) || 500;
+            const plan = u.plan || "default";
+            const email = u.email || "—";
+            tr.innerHTML = `
+              <td>${escapeHtml(u.username)}</td>
+              <td>${escapeHtml(email)}</td>
+              <td>${escapeHtml(fmtWhen(u.created_at))}</td>
+              <td>${escapeHtml(fmtWhen(u.last_login))}</td>
+              <td>${escapeHtml(features(u))}</td>
+              <td>${Number(u.job_count) || 0}</td>
+              <td>${escapeHtml(u.status || "active")}</td>
+              <td class="col-credits"><input type="text" value="—" disabled title="Credits are not in use yet" aria-label="Credits (coming soon)" /></td>
+              <td><input type="number" min="30" max="5000" step="1" value="${cap}" data-cap-user="${escapeHtml(u.username)}" style="width:5.5rem;min-height:40px" /></td>
+              <td><input type="text" value="${escapeHtml(plan)}" data-plan-user="${escapeHtml(u.username)}" style="width:7rem;min-height:40px" title="Ready for a future paid plan" /></td>
+              <td>
+                <button type="button" class="primary" data-user="${escapeHtml(u.username)}" data-on="${u.mosaic_enabled ? "1" : "0"}">${toggleLabel}</button>
+                <button type="button" class="ghost" data-save-limits="${escapeHtml(u.username)}">Save cap</button>
+              </td>`;
+            tbody.appendChild(tr);
+          }
+          document.querySelectorAll(".sort-btn").forEach((btn) => {
+            btn.setAttribute("aria-sort", btn.dataset.sort === sortKey ? (sortDir === "asc" ? "ascending" : "descending") : "none");
+          });
+        } catch (err) {
+          error.hidden = false;
+          error.textContent = err.message || "Could not load users.";
+        }
+      }
+      tbody.addEventListener("click", async (ev) => {
+        const save = ev.target.closest("button[data-save-limits]");
+        const btn = ev.target.closest("button[data-user]");
+        if (save) {
+          save.disabled = true;
+          const name = save.dataset.saveLimits;
+          const capInput = tbody.querySelector(`[data-cap-user="${CSS.escape(name)}"]`);
+          const planInput = tbody.querySelector(`[data-plan-user="${CSS.escape(name)}"]`);
+          try {
+            await setPhotoLimits(name, { photoCap: Number(capInput.value), plan: planInput.value });
+            await render();
+          } catch (err) {
+            error.hidden = false;
+            error.textContent = err.message || "Could not update that cap.";
+            save.disabled = false;
+          }
+          return;
+        }
+        if (!btn) return;
+        btn.disabled = true;
+        try {
+          await setMosaicEnabled(btn.dataset.user, btn.dataset.on !== "1");
+          await render();
+        } catch (err) {
+          error.hidden = false;
+          error.textContent = err.message || "Could not update that user.";
+          btn.disabled = false;
+        }
+      });
+      document.querySelector("#userTable thead").addEventListener("click", (ev) => {
+        const btn = ev.target.closest("[data-sort]");
+        if (!btn) return;
+        if (sortKey === btn.dataset.sort) sortDir = sortDir === "asc" ? "desc" : "asc";
+        else { sortKey = btn.dataset.sort; sortDir = "asc"; }
+        render();
+      });
+      search.addEventListener("input", () => { render(); });
+
+      function fmtBytes(n) {
+        const v = Number(n);
+        if (!Number.isFinite(v) || v < 0) return "—";
+        const gb = v / (1024 ** 3);
+        if (gb >= 10) return `${gb.toFixed(0)} GB`;
+        if (gb >= 1) return `${gb.toFixed(1)} GB`;
+        return `${(v / (1024 ** 2)).toFixed(0)} MB`;
+      }
+      function fmtElapsed(sec) {
+        const n = Number(sec);
+        if (!Number.isFinite(n) || n < 0) return "";
+        const s = Math.floor(n);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const r = s % 60;
+        if (h) return `${h}h ${String(m).padStart(2, "0")}m ${String(r).padStart(2, "0")}s`;
+        if (m) return `${m} min ${String(r).padStart(2, "0")}s`;
+        return `${r}s`;
+      }
+      function meter(label, text, pct, level) {
+        const width = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+        return `<div class="host-meter is-${level || "ok"}"><span class="k">${label}</span><span class="v">${text}</span><div class="host-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${width}" aria-label="${label}"><span style="width:${width}%"></span></div></div>`;
+      }
+      function drawHistory(samples) {
+        const canvas = document.getElementById("hostHistory");
+        const note = document.getElementById("hostHistoryNote");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#1b2228";
+        ctx.fillRect(0, 0, w, h);
+        const pts = (samples || []).filter((s) => Number.isFinite(s.cpu_pct));
+        if (pts.length < 2) {
+          if (note) note.textContent = "CPU history will fill in over the last hour as this page stays open (and after the API is updated).";
+          return;
+        }
+        if (note) note.textContent = `CPU over the last hour (${pts.length} samples).`;
+        const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
+        const span = Math.max(1, t1 - t0);
+        ctx.beginPath();
+        ctx.strokeStyle = "#5ee0b1";
+        ctx.lineWidth = 2;
+        pts.forEach((s, i) => {
+          const x = ((s.t - t0) / span) * (w - 4) + 2;
+          const y = (1 - Math.max(0, Math.min(100, s.cpu_pct)) / 100) * (h - 4) + 2;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      function renderProcessing(data) {
+        const host = data.host || {};
+        const load = host.load || {};
+        const disk = host.disk || {};
+        const meters = document.getElementById("hostMeters");
+        if (meters) {
+          const cpuText = host.cpu_pct == null ? "…" : `${host.cpu_pct.toFixed(0)}%` + (load["1"] != null ? ` · load ${load["1"]} (${host.ncpu} CPUs)` : "");
+          const ramText = host.ram_pct == null ? "—" : `${host.ram_pct.toFixed(0)}% · ${fmtBytes(host.ram_used_bytes)} of ${fmtBytes(host.ram_total_bytes)}`;
+          const swapText = !host.swap_total_bytes ? "None" : `${host.swap_pct.toFixed(0)}% · ${fmtBytes(host.swap_used_bytes)} of ${fmtBytes(host.swap_total_bytes)}`;
+          const diskText = `${fmtBytes(disk.free_bytes)} free of ${fmtBytes(disk.total_bytes)}`;
+          meters.innerHTML =
+            meter("CPU", cpuText, host.cpu_pct, host.cpu_level) +
+            meter("Load", load["1"] == null ? "—" : `${load["1"]} / ${load["5"]} / ${load["15"]}`, host.ncpu ? (100 * load["1"]) / host.ncpu : 0, host.load_level) +
+            meter("RAM", ramText, host.ram_pct, host.ram_level) +
+            meter("Swap", swapText, host.swap_pct, host.swap_level) +
+            meter("Disk free", diskText, host.disk_used_pct, host.disk_level);
+        }
+        drawHistory(data.history || []);
+        const run = document.getElementById("runningJob");
+        if (run) {
+          const j = data.running;
+          if (!j) run.innerHTML = `<p class="note">No job is running right now.</p>`;
+          else {
+            const elapsed = fmtElapsed(j.elapsed_sec);
+            run.innerHTML = `<div class="mission-card"><strong>${j.user} — ${j.name}</strong><p>${j.photo_count || 0} photos · ${j.stage_label || j.stage || j.status} ${j.progress_pct || 0}%${elapsed ? " · " + elapsed : ""}</p><p class="note">${j.progress || ""} · ${j.source}</p></div>`;
+          }
+        }
+        const qbox = document.getElementById("jobQueue");
+        if (qbox) {
+          const q = data.queue || [];
+          if (!q.length) qbox.innerHTML = `<p class="note">The queue is empty.</p>`;
+          else {
+            qbox.innerHTML = q.map((j) => {
+              const wait = j.waiting_since ? new Date(Number(j.waiting_since) * 1000).toLocaleString() : "";
+              return `<div class="mission-card"><strong>${j.user} — ${j.name}</strong><p>${j.photo_count || 0} photos · waiting since ${wait}</p></div>`;
+            }).join("");
+          }
+        }
+        const w = document.getElementById("webodmStatus");
+        if (w) {
+          const n = data.webodm || {};
+          if (n.reachable) {
+            const bits = ["WebODM is reachable"];
+            if (n.nodes_online != null) bits.push(`${n.nodes_online} node(s) online`);
+            if (n.node_queue != null) bits.push(`node queue ${n.node_queue}`);
+            if (n.task_status) bits.push(`current task: ${n.task_status}`);
+            w.textContent = bits.join(" · ");
+          } else {
+            w.textContent = n.detail || "WebODM status was not available.";
+          }
+        }
+      }
+      async function refreshProcessing() {
+        try {
+          const data = await getAdminProcessing();
+          renderProcessing(data);
+        } catch (err) {
+          const run = document.getElementById("runningJob");
+          if (run) run.innerHTML = `<p class="note">${err.message || "Processing status is not available on this API yet. It will appear after the API is updated and restarted."}</p>`;
+        }
+      }
+      async function refreshFeedback() {
+        const box = document.getElementById("feedbackList");
+        if (!box) return;
+        try {
+          const items = await listFeedback();
+          if (!items.length) {
+            box.innerHTML = `<p class="note">No feedback yet.</p>`;
+            return;
+          }
+          box.innerHTML = items.map((it) => {
+            const when = it.created_at ? new Date(Number(it.created_at) * 1000).toLocaleString() : "";
+            const cls = it.is_read ? "" : " is-unread";
+            const label = it.is_read ? "Mark unread" : "Mark read";
+            return `<div class="feedback-item${cls}"><div class="meta"><strong>${it.username}</strong> · ${when}</div><div>${String(it.message || "").replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}</div><button type="button" data-fb="${it.id}" data-read="${it.is_read ? "0" : "1"}">${label}</button></div>`;
+          }).join("");
+        } catch (err) {
+          box.innerHTML = `<p class="note">${err.message || "Feedback is not available on this API yet."}</p>`;
+        }
+      }
+      document.getElementById("feedbackList")?.addEventListener("click", async (ev) => {
+        const btn = ev.target.closest("[data-fb]");
+        if (!btn) return;
+        try {
+          await setFeedbackRead(btn.getAttribute("data-fb"), btn.getAttribute("data-read") === "1");
+          await refreshFeedback();
+        } catch (err) {
+          error.hidden = false;
+          error.textContent = err.message;
+        }
+      });
+      await refreshProcessing();
+      await refreshFeedback();
+      setInterval(refreshProcessing, 10000);
+      setInterval(refreshFeedback, 30000);
+
+      await render();
+    }
+  </script>
+</body>
+</html>

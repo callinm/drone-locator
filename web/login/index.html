@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" data-product="locator">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log in — Drone Locator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/app.css" />
+</head>
+<body class="auth-page">
+  <div class="page-tabs">
+    <div class="page-brand">
+      <strong><a href="../" style="color:inherit;text-decoration:none">Drone Locator</a></strong>
+      <span>Search a stitched map for a lost aircraft.</span>
+    </div>
+  </div>
+  <main class="auth-main">
+    <form class="auth-card" id="loginForm">
+      <h1>Log in</h1>
+      <p class="lead">Use your Drone Locator username and password. Your pictures stay private to your account.</p>
+      <div class="error" id="error" hidden></div>
+      <label class="field">
+        <span class="lbl">Username</span>
+        <input type="text" name="username" autocomplete="username" required maxlength="32" />
+      </label>
+      <label class="field">
+        <span class="lbl">Password</span>
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <button type="submit" class="primary">Log in</button>
+      <p class="auth-switch">New here? <a href="../signup/">Create an account</a></p>
+    </form>
+  </main>
+  <script type="module">
+    import { initAuthChrome, isAuthenticated, login, plannerHref } from "../js/auth.js";
+    await initAuthChrome();
+    if (isAuthenticated()) location.replace(plannerHref("home"));
+    const form = document.getElementById("loginForm");
+    const error = document.getElementById("error");
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      error.hidden = true;
+      const data = new FormData(form);
+      try {
+        await login(String(data.get("username") || ""), String(data.get("password") || ""));
+        location.replace(plannerHref("home"));
+      } catch (err) {
+        error.hidden = false;
+        error.textContent = err.message || "Could not sign in.";
+      }
+    });
+  </script>
+  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.0</footer>
+</body>
+</html>

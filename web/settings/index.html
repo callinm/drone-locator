@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-product="locator">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Account Settings — Drone Locator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/app.css" />
+</head>
+<body class="auth-page">
+  <div class="page-tabs">
+    <div class="page-brand">
+      <strong><a href="../" style="color:inherit;text-decoration:none">Drone Locator</a></strong>
+      <span>Search a stitched map for a lost aircraft.</span>
+    </div>
+  </div>
+  <main class="auth-main">
+    <div class="auth-card">
+      <h1>Account Settings</h1>
+      <p class="lead" id="productVersion">Drone Locator web 1.0.0</p>
+      <p class="lead" id="who">Change your password or delete your own account. Deleting removes only your account and its data.</p>
+      <div class="error" id="error" hidden></div>
+      <div class="ok" id="ok" hidden></div>
+
+      <section style="margin-bottom:28px">
+        <h2 style="font-size:16px;margin:0 0 12px">Tutorial</h2>
+        <p class="lead">Replay the short tutorial for this app. You can skip it at any time.</p>
+        <a class="btn primary" href="../?tour=1" style="display:inline-flex;min-height:44px;align-items:center">Replay tutorial</a>
+      </section>
+
+      <section style="margin-bottom:28px">
+        <h2 style="font-size:16px;margin:0 0 12px">Feedback</h2>
+        <p class="lead">Tell us what is working or what got in the way. Messages go to the site admin. Please do not include passwords.</p>
+        <form id="feedbackForm">
+          <label class="field">
+            <span class="lbl">Your message</span>
+            <textarea name="message" rows="5" maxlength="2000" required placeholder="What happened, and what would help?"></textarea>
+          </label>
+          <button type="submit" class="primary">Send feedback</button>
+        </form>
+      </section>
+
+      <form id="passwordForm">
+        <h2 style="font-size:16px;margin:0 0 12px">Change password</h2>
+        <label class="field">
+          <span class="lbl">Current password</span>
+          <input type="password" name="current_password" autocomplete="current-password" required />
+        </label>
+        <label class="field">
+          <span class="lbl">New password (at least 10 characters)</span>
+          <input type="password" name="new_password" autocomplete="new-password" required minlength="10" />
+        </label>
+        <button type="submit" class="primary">Update password</button>
+      </form>
+
+      <div class="danger-zone">
+        <h2>Delete my account</h2>
+        <p class="lead">This permanently removes your account and your pictures. Type your password to confirm. Other accounts are not affected.</p>
+        <form id="deleteForm">
+          <label class="field">
+            <span class="lbl">Type your password to confirm</span>
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="danger">Delete my account</button>
+        </form>
+      </div>
+    </div>
+  </main>
+  <script type="module">
+    import { initAuthChrome, isAuthenticated, currentUser, changePassword, deleteAccount, sendFeedback, plannerHref } from "../js/auth.js";
+    import { applyProductChrome } from "../js/product.js";
+    applyProductChrome();
+    await initAuthChrome();
+    if (!isAuthenticated()) location.replace(plannerHref("login"));
+    const who = document.getElementById("who");
+    const user = currentUser();
+    if (user) who.textContent = `Signed in as ${user.username}. Change your password or delete only this account and its data.`;
+    const error = document.getElementById("error");
+    const ok = document.getElementById("ok");
+    function showErr(msg) { error.hidden = !msg; error.textContent = msg || ""; ok.hidden = true; }
+    function showOk(msg) { ok.hidden = !msg; ok.textContent = msg || ""; error.hidden = true; }
+
+    document.getElementById("feedbackForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const data = new FormData(ev.target);
+      try {
+        await sendFeedback(String(data.get("message") || ""));
+        ev.target.reset();
+        showOk("Feedback sent. Thank you.");
+      } catch (err) {
+        showErr(err.message || "Could not send that feedback.");
+      }
+    });
+
+    document.getElementById("passwordForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const data = new FormData(ev.target);
+      try {
+        await changePassword(String(data.get("current_password") || ""), String(data.get("new_password") || ""));
+        ev.target.reset();
+        showOk("Password updated.");
+      } catch (err) {
+        showErr(err.message || "Could not change password.");
+      }
+    });
+
+    document.getElementById("deleteForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const data = new FormData(ev.target);
+      if (!confirm("Delete your account and its data? This cannot be undone.")) return;
+      try {
+        await deleteAccount(String(data.get("password") || ""));
+        location.replace(plannerHref("signup"));
+      } catch (err) {
+        showErr(err.message || "Could not delete the account.");
+      }
+    });
+  </script>
+</body>
+</html>

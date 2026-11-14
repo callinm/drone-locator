@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" data-product="locator">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Create a Drone Locator account." />
+  <title>Create an account — Drone Locator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/app.css" />
+</head>
+<body class="auth-page">
+  <div class="page-tabs">
+    <div class="page-brand">
+      <strong><a href="../" style="color:inherit;text-decoration:none">Drone Locator</a></strong>
+      <span>Search a stitched map for a lost aircraft.</span>
+    </div>
+  </div>
+  <main class="auth-main">
+    <form class="auth-card" id="signupForm" autocomplete="off">
+      <h1>Create an account</h1>
+      <p class="lead">No invite code needed. New accounts start blank, pictures stay private, and mapping stays locked until an admin enables it for your account.</p>
+      <div class="error" id="error" hidden></div>
+      <label class="field">
+        <span class="lbl">Username</span>
+        <input type="text" name="username" autocomplete="username" required maxlength="32" />
+      </label>
+      <label class="field">
+        <span class="lbl">Password (at least 10 characters)</span>
+        <input type="password" name="password" autocomplete="new-password" required minlength="10" />
+      </label>
+      <label class="hp-field" aria-hidden="true">
+        <span>Company website</span>
+        <input type="text" name="website" tabindex="-1" autocomplete="off" />
+      </label>
+      <button type="submit" class="primary">Create account</button>
+      <p class="auth-switch">Already have an account? <a href="../login/">Log in</a></p>
+    </form>
+  </main>
+  <script type="module">
+    import { applyProductChrome, isLocator, productName } from "../js/product.js";
+    applyProductChrome();
+    const lead = document.querySelector("p.lead");
+    if (lead && isLocator()) {
+      lead.textContent = "No invite code needed. New accounts start blank, pictures stay private, and Drone Locator stays locked until an admin enables mapping for your account.";
+      document.title = "Create an account — Drone Locator";
+    }
+
+    import { initAuthChrome, isAuthenticated, signup, plannerHref } from "../js/auth.js";
+    await initAuthChrome();
+    if (isAuthenticated()) location.replace(plannerHref("home"));
+    const form = document.getElementById("signupForm");
+    const error = document.getElementById("error");
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      error.hidden = true;
+      const data = new FormData(form);
+      try {
+        await signup(
+          String(data.get("username") || ""),
+          String(data.get("password") || ""),
+          String(data.get("website") || ""),
+        );
+        try { localStorage.setItem("dm_pending_onboarding", "1"); } catch {}
+        location.replace(plannerHref("home") + "?welcome=1");
+      } catch (err) {
+        error.hidden = false;
+        error.textContent = err.message || "Could not create that account.";
+      }
+    });
+  </script>
+  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.0</footer>
+</body>
+</html>

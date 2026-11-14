@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en" data-product="locator">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drone Locator — Find a lost aircraft</title>
+  <meta name="description" content="Search a stitched map for a lost aircraft." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/app.css?v=20261113y" />
+</head>
+<body>
+  <div class="page-tabs" role="tablist" aria-label="Drone Locator sections">
+    <div class="page-brand">
+      <strong>Drone Locator</strong>
+      <span>Search a stitched map for a lost aircraft.</span>
+    </div>
+    <button type="button" id="tabPlanner" role="tab" aria-selected="false">Planner</button>
+    <button type="button" id="tabSaved" role="tab" aria-selected="false">Saved Missions</button>
+    <button type="button" id="tabFind" role="tab" aria-selected="true">Drone Locator</button>
+    <div class="auth-chrome" id="authChrome">
+      <div id="authSignedOut">
+        <a href="login/">Log in</a>
+        <a href="signup/">Sign up</a>
+      </div>
+      <div id="authSignedIn" hidden>
+        <span class="auth-name" id="authUsername"></span>
+        <a href="settings/">Account Settings</a>
+        <a href="admin/" id="authAdminLink" hidden>Admin</a>
+        <button type="button" class="linkish" id="authLogout">Log out</button>
+      </div>
+      <button type="button" id="btnShowTutorial">Show tutorial</button>
+    </div>
+  </div>
+  <div id="viewPlanner" class="page-view" hidden>
+  <div id="app">
+    <aside>
+      <header class="brand">
+        <h1>Survey planner</h1>
+        <p>Draw a field, set overlap, export a mission</p>
+      </header>
+      <div class="scroll">
+        <section class="mode-section">
+          <h2>Mode</h2>
+          <div class="mode-toggle" role="tablist" aria-label="Planner mode">
+            <button type="button" id="btnModeSimple" class="mode-btn" aria-pressed="true">Simple</button>
+            <button type="button" id="btnModeAdvanced" class="mode-btn" aria-pressed="false">Advanced</button>
+          </div>
+          <div id="simplePresets" class="presets">
+            <p class="note" id="simpleModeNote">Simple greys out the sliders and applies a preset built for the Mavic Air 2. Switch to Advanced to edit every value yourself.</p>
+            <label class="preset-card">
+              <input type="radio" name="preset" id="presetFindDrone" value="findDrone" checked />
+              <span>
+                <strong>Search flight</strong>
+                <em id="presetFindDroneMeta"></em>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section>
+          <h2>Drone</h2>
+          <label class="field">
+            <span class="lbl">Aircraft and camera</span>
+            <select id="droneModel">
+              <option value="mavic-air-2" selected>DJI Mavic Air 2 (12 MP, 1/2&quot; sensor)</option>
+              <option value="phantom-4-pro">DJI Phantom 4 Pro (20 MP, 1&quot; sensor, mechanical shutter)</option>
+            </select>
+          </label>
+          <p class="note">Flight line spacing and photo interval use this camera. Phantom 4 Pro plans export a Litchi CSV you can fly, and the Android flight app (MSDK v4) can connect to the Phantom 4 Pro too.</p>
+        </section>
+
+        <section>
+          <h2>Android app</h2>
+          <a class="btn primary download-app" href="drone-mapper.apk" download="drone-mapper.apk">Download Android flight app</a>
+          <p class="note">This is the Drone Mapper flight app. Uninstall any older build of this flight app first, then install this APK. Keep DJI Fly closed while this app is connected to the aircraft.</p>
+        </section>
+
+        <section>
+          <h2>Field</h2>
+          <label class="field">
+            <span class="lbl">Mission name</span>
+            <input type="text" id="missionName" value="Untitled survey" />
+          </label>
+          <div class="tools">
+            <button type="button" id="btnDraw" class="primary">Draw field</button>
+            <button type="button" id="btnClose" disabled>Close shape</button>
+            <button type="button" id="btnUndo" disabled>Undo point</button>
+            <button type="button" id="btnClear">Clear</button>
+            <button type="button" id="btnDemo" class="ghost">Load demo</button>
+            <button type="button" id="btnImport" class="ghost">Import JSON</button>
+            <input type="file" id="fileImport" accept="application/json,.json" hidden />
+          </div>
+          <p class="note" id="drawHint">Click Draw field, then click corners on the map. Click the first corner or Close shape to finish. Drag corners to edit.</p>
+        </section>
+
+        <section id="flightControls">
+          <h2>Flight</h2>
+          <label class="field">
+            <span class="lbl">Altitude AGL <span class="val" id="altVal">200 ft</span></span>
+            <input type="range" id="altitude" min="30" max="400" step="5" value="200" />
+          </label>
+          <label class="field">
+            <span class="lbl">Front overlap <span class="val" id="frontVal">75%</span></span>
+            <input type="range" id="frontOverlap" min="50" max="90" step="1" value="75" />
+          </label>
+          <label class="field">
+            <span class="lbl">Side overlap <span class="val" id="sideVal">70%</span></span>
+            <input type="range" id="sideOverlap" min="50" max="90" step="1" value="70" />
+          </label>
+          <label class="field">
+            <span class="lbl">Speed <span class="val" id="speedVal">11 mph</span></span>
+            <input type="range" id="speed" min="2" max="27" step="1" value="11" />
+          </label>
+          <label class="field">
+            <span class="lbl">Grid heading <span class="val" id="angleVal">0°</span></span>
+            <input type="range" id="gridAngle" min="0" max="179" step="1" value="0" />
+          </label>
+          <div class="checks">
+            <label><input type="checkbox" id="crosshatch" /> Crosshatch (second pass at 90°)</label>
+          </div>
+        </section>
+
+        <section>
+          <h2>Plan</h2>
+          <div class="stats" id="stats">
+            <div class="stat"><span class="k">GSD</span><span class="v" id="statGsd">—</span></div>
+            <div class="stat"><span class="k">Line spacing</span><span class="v" id="statSpacing">—</span></div>
+            <div class="stat"><span class="k">Photo every</span><span class="v" id="statTrigger">—</span></div>
+            <div class="stat"><span class="k">Photos</span><span class="v" id="statPhotos">—</span></div>
+            <div class="stat span-2"><span class="k">Flight time</span><span class="v" id="statTime">—</span></div>
+            <div class="stat"><span class="k">Path / area</span><span class="v" id="statPath">—</span></div>
+          </div>
+          <p class="note" id="batterySplit" hidden></p>
+          <p class="note" id="planNote">Uses Mavic Air 2 12 MP (4000×3000), 24 mm-eq, 84° diagonal FOV. Speed is capped so photos stay at least 2 s apart. Altitude is capped at 400 ft (FAA Part 107).</p>
+          <p class="warnbox" id="planWarn" hidden></p>
+          <p class="errorbox" id="planError" hidden></p>
+        </section>
+
+        <section>
+          <h2>Export</h2>
+          <div class="actions">
+            <button type="button" id="btnJson" class="primary" disabled>Mission JSON</button>
+            <button type="button" id="btnKml" disabled>KML</button>
+            <button type="button" id="btnCsv" disabled>Litchi CSV</button>
+            <button type="button" id="btnSaveLocal" disabled>Save to my list</button>
+          </div>
+          <p class="note" id="exportHint">Load the JSON in the Android flight app, or save to my list while signed in and it will show up in the app for the same account. KML opens in Google Earth. Litchi CSV is a bonus — Air 2 has no DJI waypoint API, and Litchi also flies it with virtual sticks.</p>
+          <p class="note" id="saveLocalStatus" hidden></p>
+        </section>
+      </div>
+    </aside>
+    <div class="map-wrap">
+      <div class="searchbar">
+        <input type="text" id="search" placeholder="Search a place or paste lat, lon" />
+        <button type="button" id="btnSearch">Search</button>
+        <button type="button" id="btnLocate" title="Use my location">Locate</button>
+      </div>
+      <div id="map"></div>
+      <div class="legend">
+        <span><i class="swatch field"></i> Field</span>
+        <span><i class="swatch path"></i> Flight path</span>
+        <span><i class="dot"></i> Photo</span>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div id="viewSaved" class="page-view" hidden>
+    <div id="savedApp">
+      <div class="saved-wrap">
+        <header class="brand">
+          <h1>Saved Missions</h1>
+          <p>Open a survey on the map, or download the files for the phone app</p>
+        </header>
+        <section>
+          <h2>Shared missions</h2>
+          <p class="note">These live on the website, so they show up on any phone or computer.</p>
+          <p class="errorbox" id="savedCatalogStatus" hidden></p>
+          <div id="savedCatalog" class="mission-list"></div>
+        </section>
+        <section>
+          <h2>My list</h2>
+          <p class="flying-now" id="flyingNow" hidden></p>
+          <p class="note" id="savedLocalNote">Sign in to keep this list in sync with the Android app. Until then, items stay on this device only.</p>
+          <p class="note" id="savedSyncStatus" hidden></p>
+          <div id="savedLocal" class="mission-list"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="viewFind" class="page-view">
+
+    <div class="feature-lock" data-mosaic-lock data-lock-feature="Drone Locator" hidden>
+      <div class="lock-card">
+        <h2 data-lock-title>Drone Locator is locked</h2>
+        <p data-lock-body>This mapping feature is locked. Contact an admin to enable mapping for your account.</p>
+        <div class="lock-actions">
+          <a class="btn primary" href="login/" data-lock-login>Log in</a>
+          <a class="btn primary" href="signup/" data-lock-signup>Sign up</a>
+        </div>
+      </div>
+    </div>
+    <div id="findApp">
+      <aside>
+        <header class="brand">
+          <h1>Drone Locator</h1>
+          <p>Search a stitched mosaic or orthophoto on the server</p>
+        </header>
+        <div class="scroll">
+          <section>
+            <h2>1. Mosaic</h2>
+            <div class="tools">
+              <button type="button" id="btnLoadMosaic" class="primary">Load mosaic / orthophoto</button>
+              <button type="button" id="btnUseOrtho" class="ghost">Use latest survey map</button>
+              <button type="button" id="btnFindDemo" class="ghost">Load demo</button>
+              <input type="file" id="fileMosaic" accept="image/jpeg,image/png,image/tiff,.jpg,.jpeg,.png,.tif,.tiff" hidden />
+            </div>
+            <label class="note bounds-label">Optional geographic bounds (west, south, east, north) if the file is not a GeoTIFF
+              <input type="text" id="findBounds" placeholder="-88.2264, 40.0830, -88.2240, 40.0850" autocomplete="off" />
+            </label>
+            <p class="note" id="mosaicStatus">Load a stitched mosaic or a large JPEG / TIFF. It is uploaded once and reused for later searches. Use latest survey map if one is already on this account.</p>
+          </section>
+
+          <section>
+            <h2>2. Query</h2>
+            <div class="tools">
+              <button type="button" id="btnLoadRef" class="primary">Upload reference photo</button>
+              <button type="button" id="btnClearQuery" class="ghost">Clear query</button>
+              <input type="file" id="fileRef" accept="image/jpeg,image/png,.jpg,.jpeg,.png" hidden />
+            </div>
+            <div id="refPreview" class="ref-preview" hidden></div>
+            <p class="note" id="refStatus">Click and drag a region on the mosaic, or upload a close-up of the aircraft or a marking.</p>
+          </section>
+
+          <section>
+            <h2>3. Search</h2>
+            <div class="color-tools" id="findColorTools">
+              <label><input type="checkbox" id="findMatchColor" checked /> Match color</label>
+              <label>Color
+                <select id="findColorPreset">
+                  <option value="auto">From reference photo</option>
+                  <option value="red">Red</option>
+                  <option value="orange">Orange</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="white">White</option>
+                  <option value="gray">Gray</option>
+                  <option value="blue">Blue</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </label>
+              <label id="findColorPickerWrap" hidden>Pick
+                <input type="color" id="findColorPicker" class="color-swatch" value="#e23d28" />
+              </label>
+              <label><input type="checkbox" id="findSmallMarking" /> Small marking (fin, decal)</label>
+              <label>Size (cm)
+                <input type="number" id="findTargetSizeCm" min="1" max="80" step="1" placeholder="e.g. 6" style="width:5.5em" />
+              </label>
+              <label>GSD (cm/px)
+                <input type="number" id="findGsdCm" min="0.01" max="50" step="0.01" placeholder="optional" style="width:5.5em" />
+              </label>
+              <label>Altitude (m)
+                <input type="number" id="findAltitudeM" min="1" max="500" step="1" placeholder="if no EXIF" style="width:5.5em" />
+              </label>
+            </div>
+            <div class="tools">
+              <button type="button" id="btnFindSearch" class="primary" disabled>Search mosaic</button>
+            </div>
+            <p class="note" id="findProgress">Matching runs on a small local service, not in the browser, so a large orthophoto will not freeze your phone. Small marking defaults to color-only and skips very low-altitude frames; GSD is floored so near-ground shots do not treat car windows as 6 cm targets. Match color looks for the paint against the field.</p>
+            <p class="warnbox" id="findWarn" hidden></p>
+            <p class="errorbox" id="findError" hidden></p>
+          </section>
+
+          <section>
+            <h2>Matches</h2>
+            <div id="findResults" class="candidate-list">
+              <p class="note">Top matches will appear here with a score, a box on the mosaic, and a GPS point when the mosaic is georeferenced.</p>
+            </div>
+          </section>
+        </div>
+      </aside>
+      <div class="map-wrap find-map-wrap">
+        <div id="findMap" role="application" aria-label="Drone Locator map"></div>
+        <div id="findNavigate" class="find-navigate" hidden>
+          <a id="findNavigateLink" class="btn primary" target="_blank" rel="noopener">Navigate here</a>
+          <span id="findNavigateMeta" class="find-navigate-meta"></span>
+        </div>
+        <div id="findStage" hidden>
+          <div id="findStageInner">
+            <canvas id="findCanvas"></canvas>
+            <canvas id="findOverlay"></canvas>
+          </div>
+        </div>
+        <div class="legend" id="findLegend">
+          <span><i class="swatch locate"></i> Your location</span>
+          <span><i class="swatch field"></i> Survey map</span>
+          <span><i class="swatch path"></i> Query region</span>
+          <span><i class="dot"></i> Match and confidence</span>
+          <span class="legend-zoom">Use Zoom in (+) and Zoom out (−)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="tutorialHost" hidden></div>
+  <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.0</footer>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/app.js?v=20261113y"></script>
+</body>
+</html>
