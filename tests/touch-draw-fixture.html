@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Draw box touch fixture</title>
+  <style>
+    html, body { margin: 0; background: #0e1418; color: #e8eef2; font-family: sans-serif; }
+    #stage {
+      width: 412px; height: 500px; background: #1c262e;
+      touch-action: none; position: relative; overflow: hidden;
+    }
+    #box {
+      position: absolute; border: 2px solid #e05a5a;
+      background: rgba(224,90,90,0.12); display: none; pointer-events: none;
+    }
+    #status { padding: 8px 12px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <button id="btnDraw" aria-pressed="true">Draw box</button>
+  <div id="stage"><div id="box"></div></div>
+  <p id="status">ready</p>
+  <script>
+    // Mirrors the live pointer-draw path: prevent default, no pan, box on pointerup.
+    const stage = document.getElementById("stage");
+    const box = document.getElementById("box");
+    const status = document.getElementById("status");
+    let start = null, panned = false, last = null;
+    stage.addEventListener("touchmove", () => { panned = true; }, { passive: true });
+    function pt(ev) {
+      const r = stage.getBoundingClientRect();
+      return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+    }
+    function paint(a, b) {
+      const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+      const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+      box.style.display = "block";
+      box.style.left = x + "px"; box.style.top = y + "px";
+      box.style.width = w + "px"; box.style.height = h + "px";
+      last = { x, y, w, h };
+    }
+    stage.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { stage.setPointerCapture(ev.pointerId); } catch {}
+      start = pt(ev);
+      window.__draw = { drawing: true };
+    });
+    stage.addEventListener("pointermove", (ev) => {
+      if (!start) return;
+      ev.preventDefault();
+      paint(start, pt(ev));
+    });
+    stage.addEventListener("pointerup", (ev) => {
+      if (!start) return;
+      ev.preventDefault();
+      paint(start, pt(ev));
+      start = null;
+      window.__draw = { drawing: false, box: last, panned };
+      status.textContent = last ? `box ${Math.round(last.w)}x${Math.round(last.h)} panned=${panned}` : "no box";
+    });
+    window.__draw = { drawing: false, box: null, panned: false };
+  </script>
+</body>
+</html>
