@@ -1188,3 +1188,12 @@ html[data-product="locator"] .okbox { color: #8be0b0; }
   min-height: 44px;
   min-width: 44px;
 }
+
+/* hidden must win over display:inline-flex on .btn */
+.feature-lock [hidden],
+.lock-actions [hidden],
+button[hidden],
+a.btn[hidden],
+.btn[hidden] {
+  display: none !important;
+}
