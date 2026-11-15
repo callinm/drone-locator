@@ -2,10 +2,10 @@
  * Find My Drone — upload a mosaic once, send a query (region or photo)
  * to the server matcher, and draw the returned boxes / GPS points.
  */
-import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlrr1";
-import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlrr1";
-import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js?v=20261114dlrr1";
-import { enqueue, putFindResults } from "./sync.js?v=20261114dlrr1";
+import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlrr2";
+import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlrr2";
+import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js?v=20261114dlrr2";
+import { enqueue, putFindResults } from "./sync.js?v=20261114dlrr2";
 
 const MAX_PREVIEW = 2048;
 
@@ -963,6 +963,7 @@ function ensureFindMap() {
   state.map = map;
   bindMapDraw(map);
   locateOrFallback(map, {
+    keepView: () => !!state.orthoLayer,
     onLocated: ({ lat, lon }) => {
       if (state.locateMarker) state.map.removeLayer(state.locateMarker);
       state.locateMarker = L.circleMarker([lat, lon], {

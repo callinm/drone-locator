@@ -1,4 +1,4 @@
-import { isLocator } from "./product.js?v=20261114dlrr1";
+import { isLocator } from "./product.js?v=20261114dlrr2";
 /**
  * Session helper shared by the planner and the login / signup / settings / admin pages.
  */

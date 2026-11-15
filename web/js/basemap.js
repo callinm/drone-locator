@@ -152,10 +152,10 @@ export function refreshMapSize(map) {
  * Center on the user's location when no project is open.
  * Falls back to the Midwest overview if permission is denied or GPS is unavailable.
  */
-export function locateOrFallback(map, { onDenied, onLocated } = {}) {
+export function locateOrFallback(map, { onDenied, onLocated, keepView } = {}) {
   if (!map) return;
   const fallback = () => {
-    map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
+    if (!(keepView && keepView())) map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
     onDenied?.();
   };
   if (!navigator.geolocation) {
@@ -170,7 +170,8 @@ export function locateOrFallback(map, { onDenied, onLocated } = {}) {
         fallback();
         return;
       }
-      map.setView([lat, lon], GPS_ZOOM);
+      // A search map loaded while we waited for GPS keeps the view on that map.
+      if (!(keepView && keepView())) map.setView([lat, lon], GPS_ZOOM);
       onLocated?.({ lat, lon });
     },
     () => fallback(),
