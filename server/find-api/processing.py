@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import os
+import shutil
 import threading
 import time
 import uuid
@@ -332,6 +333,7 @@ def public_view(job: dict[str, Any]) -> dict[str, Any]:
             "quality": "survey",
             "dsm_frame": frame,
             "local_frame": bool(frame and frame.get("local_frame")),
+            "photos_removed": bool(result.get("photos_removed")),
         }
     return {
         "id": job["id"],
@@ -543,7 +545,8 @@ def _uploads_dir(user_id: int, upload_id: str) -> Path:
 
 
 def _upload_manifest_path(user_id: int, upload_id: str) -> Path:
-    return _uploads_dir(user_id, upload_id) / "manifest.json"
+    # Do not create folders on lookup: a purged session must stay gone.
+    return config.DATA_DIR / "processing-uploads" / str(user_id) / upload_id / "manifest.json"
 
 
 def _load_upload(user_id: int, upload_id: str) -> dict[str, Any]:
@@ -566,7 +569,7 @@ def _save_upload(user_id: int, manifest: dict[str, Any]) -> None:
 
 def _public_upload(manifest: dict[str, Any]) -> dict[str, Any]:
     received = [{"name": f["name"], "size": int(f["size"])} for f in manifest.get("files") or []]
-    return {"id": manifest["id"], "received": received, "count": len(received)}
+    return {"id": manifest["id"], "received": received, "count": len(received), "consumed": bool(manifest.get("consumed"))}
 
 
 def create_upload_session(user: accounts.User) -> dict[str, Any]:
@@ -628,7 +631,7 @@ def add_files_to_upload(
     return out
 
 
-def _adopt_upload_photos(user: accounts.User, upload_id: str, dest: Path) -> list[tuple[str, Path]]:
+def _adopt_upload_photos(user: accounts.User, upload_id: str, dest: Path, job_id: str | None = None) -> list[tuple[str, Path]]:
     manifest = _load_upload(user.id, upload_id)
     if manifest.get("consumed"):
         raise ProcessingError(409, "This upload session has already been submitted.")
@@ -647,6 +650,9 @@ def _adopt_upload_photos(user: accounts.User, upload_id: str, dest: Path) -> lis
         srcp.replace(target)
         paths.append((rec["name"], target))
     manifest["consumed"] = True
+    if job_id:
+        # Lets the photo purge find (and remove) this staging folder later.
+        manifest["job_id"] = job_id
     _save_upload(user.id, manifest)
     return paths
 
@@ -709,7 +715,7 @@ def submit(
         )
     dest_photos = _jobs_dir(user.id, job_id) / "photos"
     if upload_id:
-        photo_paths = list(photo_paths) + _adopt_upload_photos(user, upload_id, dest_photos)
+        photo_paths = list(photo_paths) + _adopt_upload_photos(user, upload_id, dest_photos, job_id=job_id)
     if incoming:
         stored = _store_uploaded_photos(user.id, job_id, incoming)
         photo_paths = list(photo_paths) + stored
@@ -1033,7 +1039,69 @@ def _harvest(client: webodm.WebOdmClient, job: dict[str, Any], task: dict[str, A
         pipeline_stage="done",
         finished_at=_now(),
     )
+    _purge_after_success(job["id"], job["user_id"])
     return get_job(job["user_id"], job["id"]) or updated
+
+
+def _tree_size(path: Path) -> tuple[int, int]:
+    files = 0
+    total = 0
+    for f in path.rglob("*"):
+        try:
+            if f.is_file():
+                files += 1
+                total += f.stat().st_size
+        except OSError:
+            continue
+    return files, total
+
+
+def purge_input_photos(user_id: int, job_id: str) -> dict[str, Any]:
+    """Delete a finished job's input photos to save disk (Callin, 2026-11-14).
+
+    Removes processing/{user}/{job}/photos and any processing-uploads staging
+    session that fed this job. Outputs (orthophoto, DSM, preview, volumes)
+    stay. Only call after the job finished successfully; failed jobs keep
+    their photos so they can be retried.
+    """
+    removed_files = 0
+    removed_bytes = 0
+    photos = _jobs_dir(user_id, job_id) / "photos"
+    targets: list[Path] = []
+    if photos.is_dir():
+        targets.append(photos)
+    uploads_root = config.DATA_DIR / "processing-uploads" / str(user_id)
+    if uploads_root.is_dir():
+        for manifest_path in uploads_root.glob("*/manifest.json"):
+            try:
+                data = json.loads(manifest_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            if data.get("user_id") == user_id and data.get("job_id") == job_id and data.get("consumed"):
+                targets.append(manifest_path.parent)
+    for target in targets:
+        n, b = _tree_size(target)
+        try:
+            shutil.rmtree(target)
+        except OSError:
+            continue
+        removed_files += n
+        removed_bytes += b
+    return {"photos_removed": True, "photos_removed_at": _now(), "photos_removed_files": removed_files, "photos_removed_bytes": removed_bytes}
+
+
+def _purge_after_success(job_id: str, user_id: int) -> None:
+    if os.environ.get("FIND_API_KEEP_PHOTOS") == "1":
+        return
+    try:
+        info = purge_input_photos(user_id, job_id)
+        job = get_job(user_id, job_id) or {}
+        result = dict(job.get("result") or {})
+        result.update(info)
+        _update(job_id, user_id, result_meta=result)
+    except Exception:
+        # Never turn a finished map into a failure because cleanup hiccupped.
+        pass
 
 
 def _apply_stockpile_upgrade(job: dict[str, Any]) -> None:

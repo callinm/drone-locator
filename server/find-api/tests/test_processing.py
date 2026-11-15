@@ -454,3 +454,61 @@ def test_disk_full_error_is_explicit():
     resp = httpx.Response(500, text="ENOSPC: no space left on device")
     assert "out of disk space" in webodm._unavailable_detail(resp).lower()
     assert "temporarily unavailable" in webodm._unavailable_detail("connection reset").lower()
+
+
+def _finish_all(fake):
+    for tid, task in fake.tasks.items():
+        task["status"] = 40
+        task["running_progress"] = 1
+
+
+def test_success_deletes_input_photos_keeps_outputs(client):
+    c, user, fake = client
+    created = c.post("/process/uploads")
+    upload_id = created.json()["id"]
+    files = [("files", (f"p{i}.jpg", _jpeg(40, -88 + i * 0.0001, (i, 80, 40)), "image/jpeg")) for i in range(30)]
+    assert c.post(f"/process/uploads/{upload_id}/files", files=files).status_code == 200
+    started = c.post("/process", json={"upload_id": upload_id, "name": "Purge me"})
+    assert started.status_code == 201, started.text
+    pid = started.json()["id"]
+    job_dir = config.DATA_DIR / "processing" / str(user.id) / pid
+    staging = config.DATA_DIR / "processing-uploads" / str(user.id) / upload_id
+    assert len(list((job_dir / "photos").iterdir())) == 30
+    assert staging.is_dir()
+    _finish_all(fake)
+    done = c.post(f"/process/{pid}/refresh").json()
+    assert done["status"] == "done"
+    assert done["result"]["photos_removed"] is True
+    assert not (job_dir / "photos").exists()
+    assert not staging.exists()
+    assert c.get(f"/process/uploads/{upload_id}").status_code == 404
+    assert not staging.exists()
+    assert (job_dir / "dsm.tif").is_file()
+    assert c.get(f"/process/{pid}/dsm.tif").status_code == 200
+    assert c.get(f"/process/{pid}/orthophoto.png").status_code == 200
+
+
+def test_failure_keeps_input_photos(client):
+    c, user, fake = client
+    created = c.post("/process/uploads")
+    upload_id = created.json()["id"]
+    files = [("files", (f"p{i}.jpg", _jpeg(40, -88 + i * 0.0001, (i, 80, 40)), "image/jpeg")) for i in range(30)]
+    assert c.post(f"/process/uploads/{upload_id}/files", files=files).status_code == 200
+    pid = c.post("/process", json={"upload_id": upload_id, "name": "Fails"}).json()["id"]
+    for tid, task in fake.tasks.items():
+        task["status"] = 30  # FAILED
+        task["last_error"] = "boom"
+    failed = c.post(f"/process/{pid}/refresh").json()
+    assert failed["status"] == "failed"
+    job_dir = config.DATA_DIR / "processing" / str(user.id) / pid
+    assert len(list((job_dir / "photos").iterdir())) == 30
+
+
+def test_purge_leaves_other_jobs_alone(client):
+    c, user, fake = client
+    other = config.DATA_DIR / "processing" / str(user.id) / "other-job" / "photos"
+    other.mkdir(parents=True)
+    (other / "a.jpg").write_bytes(b"x")
+    info = processing.purge_input_photos(user.id, "missing-job")
+    assert info["photos_removed_files"] == 0
+    assert (other / "a.jpg").is_file()

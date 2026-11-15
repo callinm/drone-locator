@@ -62,9 +62,9 @@ def ensure_data_dir() -> Path:
 
 
 # Durable dirs that are not finder mosaics. cleanup() and the store cap
-# must leave these alone so survey processing cannot fill the locator cap
-# and so expiry cannot delete processing-uploads, stockpile, or search-map
-# staging data (searchmaps/ has its own TTL in searchmap.py).
+# must leave these alone so Piletally processing cannot fill the locator cap
+# and so expiry cannot delete processing-uploads, stockpile, or Drone Locator
+# search-map staging (searchmaps/ has its own TTL in searchmap.py).
 NON_MOSAIC_DIRS = {"stockpile", "processing", "locator", "processing-uploads", "searchmaps"}
 
 
@@ -92,10 +92,11 @@ def cleanup(now: float | None = None) -> None:
 
 
 def _store_bytes() -> int:
-    """Bytes used by finder mosaic folders only (UUID dirs with meta.json).
+    """Bytes used by finder mosaic folders only.
 
-    The shared data dir also holds processing jobs, stockpile photos, search-map
-    staging and SQLite databases; those must not count toward FIND_API_MAX_STORE.
+    The shared data dir also holds processing jobs, stockpile photos, and
+    SQLite databases. Those must not count toward FIND_API_MAX_STORE, or a
+    large survey job will block Drone Locator mosaic uploads.
     """
     total = 0
     root = ensure_data_dir()
@@ -104,6 +105,7 @@ def _store_bytes() -> int:
     for child in root.iterdir():
         if not child.is_dir() or child.name in NON_MOSAIC_DIRS:
             continue
+        # Mosaic folders are UUID directories with meta.json.
         if not (child / "meta.json").is_file():
             continue
         for p in child.rglob("*"):
