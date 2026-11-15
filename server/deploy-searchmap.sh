@@ -6,6 +6,14 @@ SRC="$1"
 TS="$(TZ=America/Chicago date +%Y%m%d-%H%M%S)CST"
 APP=/opt/drone-mapper-find
 DATA=/var/lib/drone-mapper-find
+# 0) Refuse if someone changed the live files since this branch was rebased (Nov 14 6:55 PM CST).
+cd "$APP"
+echo "cd93861f3320a286d83d4b24f14c8482300d06dfe2c88842cbd87bb9d5843c81  store.py
+b07739ea5b27adfa6464571b12b3e6fbc071fee7e947164ac8c7db7d6d98d974  app.py
+2b31005773fc7a5c8f0b43992c09b49bbf82d0d80fb79899cdee2317dc1f003b  processing.py" | sha256sum -c --quiet || { echo "live find-api changed since rebase; aborting"; exit 1; }
+cd - >/dev/null
+# Refuse while a Piletally/WebODM job is running.
+if sudo sqlite3 -readonly "$DATA/accounts.sqlite" "select count(*) from processing_jobs where status in ('queued','uploading','processing')" | grep -qv '^0$'; then echo "processing job active; aborting"; exit 1; fi
 # 1) Backups first.
 sudo tar -C /opt --exclude=drone-mapper-find/.venv --exclude=__pycache__ -czf "/var/backups/drone-mapper-find-code-$TS.tgz" drone-mapper-find
 sqlite3 "$DATA/locator.sqlite" ".backup /home/ubuntu/locator-$TS.sqlite"
