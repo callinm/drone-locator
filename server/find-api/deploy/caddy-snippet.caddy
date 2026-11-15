@@ -1,0 +1,14 @@
+# Add this handle_path block inside the wheresthepelican.com site block,
+# BEFORE the existing handle_path /drone-mapper/* static-file rule.
+# handle_path strips the /drone-mapper/api prefix, so /drone-mapper/api/health
+# is forwarded to the service as /health.
+#
+# Do not apply this until Callin has approved go-live.
+#
+#    handle_path /drone-mapper/api/* {
+#        reverse_proxy 127.0.0.1:8091
+#    }
+
+handle_path /drone-mapper/api/* {
+	reverse_proxy 127.0.0.1:8091
+}

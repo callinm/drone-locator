@@ -1,5 +1,5 @@
-find-api/
-find-api-live/
+/find-api/
+/find-api-live/
 live-ui/
 screenshots/*.png
 __pycache__/

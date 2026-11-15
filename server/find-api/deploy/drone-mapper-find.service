@@ -1,0 +1,49 @@
+[Unit]
+Description=Drone Mapper Find My Drone matcher (localhost only)
+After=network.target
+Documentation=file:/opt/drone-mapper-find/deploy/README.md
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/drone-mapper-find
+Environment=FIND_API_HOST=127.0.0.1
+Environment=FIND_API_PORT=8091
+Environment=FIND_API_DATA=/var/lib/drone-mapper-find
+Environment=FIND_API_CV_THREADS=2
+Environment=FIND_API_MATCH_CONCURRENCY=2
+Environment=FIND_API_MATCH_TIMEOUT=20
+Environment=FIND_API_MAX_UPLOAD=262144000
+Environment=FIND_API_MAX_STORE=2147483648
+Environment=FIND_API_MAX_MOSAICS=4
+Environment=FIND_API_TTL=43200
+Environment=FIND_API_MAX_PIXELS=500000000
+Environment=FIND_API_WORKING_DIM=8000
+Environment=FIND_API_COOKIE_PATH=/
+Environment=FIND_API_SECURE_COOKIES=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=WEBODM_BASE_URL=http://127.0.0.1:8001
+Environment=WEBODM_CREDENTIALS_FILE=/var/lib/drone-mapper-find/webodm-credentials.txt
+# Bind 127.0.0.1 only — Caddy terminates TLS and reverse-proxies /drone-mapper/api/.
+ExecStart=/opt/drone-mapper-find/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8091 --workers 1 --log-level info
+Restart=on-failure
+RestartSec=3
+# Stay within the VPS (6 CPU, 11 GiB, no swap). Cap is 4G so a ~100-photo
+# staging/upload has headroom, while leaving RAM for WebODM/NodeODM.
+CPUQuota=200%
+MemoryMax=4G
+MemorySwapMax=0
+TasksMax=64
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+# Canonical 0600 file stays under /home/ubuntu/private; bind it into the data dir
+# because ProtectHome=yes hides /home from the service.
+BindReadOnlyPaths=/home/ubuntu/private/drone-mapper-webodm.txt:/var/lib/drone-mapper-find/webodm-credentials.txt
+ReadWritePaths=/var/lib/drone-mapper-find
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
