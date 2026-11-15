@@ -61,14 +61,20 @@ def ensure_data_dir() -> Path:
     return config.DATA_DIR
 
 
+# Durable dirs that are not finder mosaics. cleanup() and the store cap
+# must leave these alone so survey processing cannot fill the locator cap
+# and so expiry cannot delete processing-uploads, stockpile, or search-map
+# staging data (searchmaps/ has its own TTL in searchmap.py).
+NON_MOSAIC_DIRS = {"stockpile", "processing", "locator", "processing-uploads", "searchmaps"}
+
+
 def cleanup(now: float | None = None) -> None:
     now = now or _now()
     root = ensure_data_dir()
     # Mosaic previews live in UUID folders with meta.json. Never touch
     # stockpile photos, processing results, or other durable account data.
-    skip = {"stockpile", "processing", "locator"}
     for child in root.iterdir():
-        if not child.is_dir() or child.name in skip:
+        if not child.is_dir() or child.name in NON_MOSAIC_DIRS:
             continue
         meta = child / "meta.json"
         stale = False
@@ -86,11 +92,23 @@ def cleanup(now: float | None = None) -> None:
 
 
 def _store_bytes() -> int:
+    """Bytes used by finder mosaic folders only (UUID dirs with meta.json).
+
+    The shared data dir also holds processing jobs, stockpile photos, search-map
+    staging and SQLite databases; those must not count toward FIND_API_MAX_STORE.
+    """
     total = 0
     root = ensure_data_dir()
-    for p in root.rglob("*"):
-        if p.is_file():
-            total += p.stat().st_size
+    if not root.exists():
+        return 0
+    for child in root.iterdir():
+        if not child.is_dir() or child.name in NON_MOSAIC_DIRS:
+            continue
+        if not (child / "meta.json").is_file():
+            continue
+        for p in child.rglob("*"):
+            if p.is_file():
+                total += p.stat().st_size
     return total
 
 
