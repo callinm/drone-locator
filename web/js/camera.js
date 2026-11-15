@@ -14,7 +14,7 @@
  * FAA Part 107 altitude limit: 400 ft AGL = 121.92 m (international foot).
  */
 
-import { FAA_MAX_ALTITUDE_M } from "./units.js?v=20261114dlpm2";
+import { FAA_MAX_ALTITUDE_M } from "./units.js?v=20261114dlpm3";
 export { FAA_MAX_ALTITUDE_M };
 export const DEFAULT_ALTITUDE_M = 60;
 export const DEFAULT_FRONT_OVERLAP = 0.75;

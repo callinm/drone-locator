@@ -3,13 +3,13 @@
  * build the synthetic demo pile. Volume math lives in volume.js and
  * stays independent of the GeoTIFF library so tests can run in Node.
  */
-import { toLocal, toLatLon, EARTH_RADIUS_M, toRad, toDeg } from "./geo.js?v=20261114dlpm2";
+import { toLocal, toLatLon, EARTH_RADIUS_M, toRad, toDeg } from "./geo.js?v=20261114dlpm3";
 import {
   makeDsm,
   fillPlane,
   addCone,
   pixelCenter,
-} from "./volume.js?v=20261114dlpm2";
+} from "./volume.js?v=20261114dlpm3";
 
 export const DEMO = Object.freeze({
   // A quiet corner of the public South Farms demo field — synthetic only.

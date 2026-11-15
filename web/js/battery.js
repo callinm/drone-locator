@@ -13,7 +13,7 @@
  * Usable minutes from a partially charged pack = (percent − 30) / 100 × 28.
  * Preflight will not start below 40% (only ~2.8 min left before the 30% floor).
  */
-import { MAVIC_AIR_2 } from "./camera.js?v=20261114dlpm2";
+import { MAVIC_AIR_2 } from "./camera.js?v=20261114dlpm3";
 
 export const BATTERY = Object.freeze({
   capacityMah: 3500,

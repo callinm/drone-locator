@@ -24,7 +24,7 @@ async def main():
               const r = s => { const e = document.querySelector(s); if (!e || !e.offsetParent) return null; const b = e.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.height), Math.round(b.width)]; };
               const mods = performance.getEntriesByType('resource').map(e => e.name).filter(n => /\\/js\\//.test(n)).map(n => n.split('/').pop());
               return {btn: r('#btnPhotoMap'), btnText: document.querySelector('#btnPhotoMap')?.innerText, have: r('#btnLoadMosaic'), header: r('.page-tabs'), map: r('.find-map-wrap'),
-                      unversioned: mods.filter(m => !m.includes('v=20261114dlpm2')), photomap: mods.filter(m => m.startsWith('photomap'))};
+                      unversioned: mods.filter(m => !m.includes('v=20261114dlpm3')), photomap: mods.filter(m => m.startsWith('photomap'))};
             }""")
             print(name, json.dumps(info))
             await pg.screenshot(path=f"{OUT}/live-pm-{name}-1-step1.png")

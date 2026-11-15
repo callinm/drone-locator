@@ -365,14 +365,6 @@ def create_job(user_id: int) -> dict[str, Any]:
                     _update(job["id"], status="cancelled", stage="cancelled", finished_at=_now(), photos_deleted_at=_now())
             else:
                 raise SearchMapError(409, "A search map is already being made for your account. Wait for it to finish.")
-        import store
-
-        if store._mosaic_count(str(user_id)) >= config.MAX_MOSAICS:
-            # Say so before any photo is uploaded.
-            raise SearchMapError(
-                409,
-                f"You already have {config.MAX_MOSAICS} search maps on the server. Wait for one to expire (12 hours) before making another.",
-            )
         job_id = uuid.uuid4().hex
         now = _now()
         _q(
@@ -481,11 +473,6 @@ def start_job(user_id: int, job_id: str) -> dict[str, Any]:
     import store
 
     store.cleanup()
-    if store._mosaic_count(str(user_id)) >= config.MAX_MOSAICS:
-        raise SearchMapError(
-            409,
-            f"You already have {config.MAX_MOSAICS} search maps on the server. Wait for one to expire (12 hours) before making another.",
-        )
     options, extent = plan_options(items)
     job = _update(
         job_id, status="submitting", stage="submitting", progress_pct=1, error=None,

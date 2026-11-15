@@ -24,7 +24,7 @@ import {
   computeTriggerDistanceM,
   getCamera,
   MAVIC_AIR_2,
-} from "./camera.js?v=20261114dlpm2";
+} from "./camera.js?v=20261114dlpm3";
 
 export const PRESETS = Object.freeze({
   stockpile: Object.freeze({

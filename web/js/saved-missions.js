@@ -1,9 +1,9 @@
 import {
   formatAltitudeFtExact,
   formatDistance,
-} from "./units.js?v=20261114dlpm2";
-import { parseMissionJson } from "./export.js?v=20261114dlpm2";
-import { isAuthenticated, onAuthChange } from "./auth.js?v=20261114dlpm2";
+} from "./units.js?v=20261114dlpm3";
+import { parseMissionJson } from "./export.js?v=20261114dlpm3";
+import { isAuthenticated, onAuthChange } from "./auth.js?v=20261114dlpm3";
 import {
   deleteMission as syncDeleteMission,
   enqueue,
@@ -19,7 +19,7 @@ import {
   saveMission as syncSaveMission,
   startPolling,
   writeCache,
-} from "./sync.js?v=20261114dlpm2";
+} from "./sync.js?v=20261114dlpm3";
 
 export const INDEX_FORMAT = "drone-mapper-missions-index";
 export const INDEX_URL = "missions/index.json";

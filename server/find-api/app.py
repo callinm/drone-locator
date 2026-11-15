@@ -1191,6 +1191,7 @@ def _mosaic_payload(mosaic) -> dict:
         "georeferenced": mosaic.georef is not None,
         "crs": mosaic.georef.crs if mosaic.georef else None,
         "bounds": bounds,
+        "replaced_oldest": len(getattr(mosaic, "replaced", None) or []),
     }
 
 

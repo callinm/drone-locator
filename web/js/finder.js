@@ -2,11 +2,11 @@
  * Find My Drone — upload a mosaic once, send a query (region or photo)
  * to the server matcher, and draw the returned boxes / GPS points.
  */
-import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlpm2";
-import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlpm2";
-import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage, onAuthChange } from "./auth.js?v=20261114dlpm2";
-import { uploadAndStart, latestJob, getJob, cancelJob, startJob, MIN_PHOTOS } from "./photomap.js?v=20261114dlpm2";
-import { enqueue, putFindResults } from "./sync.js?v=20261114dlpm2";
+import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlpm3";
+import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlpm3";
+import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage, onAuthChange } from "./auth.js?v=20261114dlpm3";
+import { uploadAndStart, latestJob, getJob, cancelJob, startJob, MIN_PHOTOS } from "./photomap.js?v=20261114dlpm3";
+import { enqueue, putFindResults } from "./sync.js?v=20261114dlpm3";
 
 const MAX_PREVIEW = 2048;
 
@@ -363,10 +363,13 @@ function applyLoadedMosaic(body, sourceNote) {
   const geo = body.georeferenced
     ? "location data included" + (body.bounds ? ` (${body.bounds.west.toFixed(5)}, ${body.bounds.south.toFixed(5)})–(${body.bounds.east.toFixed(5)}, ${body.bounds.north.toFixed(5)})` : "")
     : "no location data — add the area corners under More options and upload again if you want walking directions";
-  setMosaicStatus(sourceNote || (
+  const replaced = body.replaced_oldest > 0
+    ? ` It replaced your oldest map (you can keep 4 maps).`
+    : "";
+  setMosaicStatus((sourceNote || (
     `“${body.filename}” is on the server — ${body.width}×${body.height} px, ${geo}. ` +
     `Later searches reuse this map so the file is not sent again.`
-  ));
+  )) + replaced);
   if (body.bounds) fillBoundsInput(body.bounds);
   setProgress("The map is on the server. Draw a box or upload a photo of your drone, then search.");
   enableSearch();

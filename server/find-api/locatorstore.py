@@ -227,6 +227,13 @@ def register_mosaic(mosaic_id: str, folder: Path, meta: dict[str, Any], *, sourc
         )
 
 
+def unregister_mosaic(mosaic_id: str) -> None:
+    init()
+    conn = _connect()
+    with _lock:
+        conn.execute("DELETE FROM mosaics WHERE id = ?", (mosaic_id,))
+
+
 def get_find_results(user_id: int) -> dict[str, Any] | None:
     init()
     conn = _connect()

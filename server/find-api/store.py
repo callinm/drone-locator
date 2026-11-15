@@ -6,7 +6,7 @@ import json
 import shutil
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -40,6 +40,8 @@ class Mosaic:
     filename: str
     content_type: str
     owner_id: str | None = None
+    # Ids of this owner's oldest maps that this save replaced (over MAX_MOSAICS).
+    replaced: list[str] = field(default_factory=list)
 
 
 def _magic_ok(head: bytes) -> str | None:
@@ -143,6 +145,7 @@ def load_mosaic(mosaic_id: str) -> Mosaic:
     if data.get("expires", 0) < _now():
         shutil.rmtree(folder, ignore_errors=True)
         raise FileNotFoundError("Unknown or expired mosaic id.")
+    _mark_used(mosaic_id)
     georef = GeoRef.from_dict(data["georef"]) if data.get("georef") else None
     return Mosaic(
         id=mosaic_id,
@@ -258,7 +261,9 @@ def save_mosaic(
         cleanup()
         if _store_bytes() + len(data) > config.MAX_STORE_BYTES:
             raise ValueError("Mosaic store is full. Wait for an older upload to expire, or delete one.")
-    if _mosaic_count(owner_id) >= config.MAX_MOSAICS:
+    # A signed-in owner at the limit keeps going: their oldest map is replaced,
+    # but only after the new one is saved (see _evict_oldest below).
+    if owner_id is None and _mosaic_count(owner_id) >= config.MAX_MOSAICS:
         cleanup()
         if _mosaic_count(owner_id) >= config.MAX_MOSAICS:
             raise ValueError(f"At most {config.MAX_MOSAICS} mosaics can be stored at once.")
@@ -316,7 +321,63 @@ def save_mosaic(
         locatorstore.register_mosaic(mosaic_id, folder, meta, source="new")
     except Exception:
         pass
-    return load_mosaic(mosaic_id)
+    mosaic = load_mosaic(mosaic_id)
+    if owner_id is not None:
+        mosaic.replaced = _evict_oldest(owner_id, keep=mosaic_id)
+    return mosaic
+
+
+# Maps read in the last few minutes (a search, preview, or load in flight) are
+# never replaced; the next-oldest one goes instead.
+IN_USE_GRACE_S = 180.0
+_last_used: dict[str, float] = {}
+
+
+def _mark_used(mosaic_id: str) -> None:
+    _last_used[mosaic_id] = _now()
+
+
+def _owner_mosaics(owner_id: str) -> list[tuple[float, Path]]:
+    out = []
+    for child in ensure_data_dir().iterdir():
+        meta = child / "meta.json"
+        if not child.is_dir() or child.name in NON_MOSAIC_DIRS or not meta.is_file():
+            continue
+        try:
+            data = json.loads(meta.read_text())
+        except Exception:
+            continue
+        if str(data.get("owner_id") or "") == str(owner_id):
+            out.append((float(data.get("created") or 0), child))
+    out.sort(key=lambda t: t[0])
+    return out
+
+
+def _evict_oldest(owner_id: str, keep: str) -> list[str]:
+    """Remove this owner's oldest maps until they are back at MAX_MOSAICS.
+
+    Only the same owner's maps, never `keep` (the map just saved), and never a
+    map used in the last IN_USE_GRACE_S seconds.
+    """
+    removed: list[str] = []
+    mine = _owner_mosaics(owner_id)
+    excess = len(mine) - config.MAX_MOSAICS
+    now = _now()
+    for _created, folder in mine:
+        if excess <= 0:
+            break
+        mid = folder.name
+        if mid == keep or now - _last_used.get(mid, 0.0) < IN_USE_GRACE_S:
+            continue
+        shutil.rmtree(folder, ignore_errors=True)
+        try:
+            locatorstore.unregister_mosaic(mid)
+        except Exception:
+            pass
+        _last_used.pop(mid, None)
+        removed.append(mid)
+        excess -= 1
+    return removed
 
 
 

@@ -1,5 +1,5 @@
-import { getCamera, MAVIC_AIR_2 } from "./camera.js?v=20261114dlpm2";
-import { formatAltitudeFt } from "./units.js?v=20261114dlpm2";
+import { getCamera, MAVIC_AIR_2 } from "./camera.js?v=20261114dlpm3";
+import { formatAltitudeFt } from "./units.js?v=20261114dlpm3";
 
 export const MISSION_FORMAT = "drone-mapper-mission";
 export const MISSION_VERSION = 1;

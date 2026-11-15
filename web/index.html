@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=20261114dlpm2" />
+  <link rel="stylesheet" href="css/app.css?v=20261114dlpm3" />
 </head>
 <body>
   <div class="page-tabs" role="tablist" aria-label="Drone Locator sections">
@@ -231,7 +231,7 @@
               <button type="button" id="btnPhotoMap" class="primary">Make a map from my flight photos</button>
               <input type="file" id="filePhotoMap" accept="image/jpeg,.jpg,.jpeg" multiple hidden />
             </div>
-            <p class="note" id="photoMapNote">Pick all the photos from your search flight (straight-down photos with GPS, 5 to 200). Our server stitches them into one map, usually in 5 to 20 minutes. Your photos are deleted from our server as soon as the map is made.</p>
+            <p class="note" id="photoMapNote">Pick all the photos from your search flight (straight-down photos with GPS, 5 to 200). Our server stitches them into one map, usually in 5 to 20 minutes. Your photos are deleted from our server as soon as the map is made. You can keep 4 maps for 12 hours; a new one replaces your oldest map.</p>
             <div class="photomap" id="photoMapPanel" role="status" aria-live="polite" hidden>
               <ol class="photomap-steps">
                 <li data-pm-step="upload"><span class="pm-dot" aria-hidden="true"></span><span class="pm-label">Upload photos</span><span class="pm-detail" data-pm-detail="upload"></span></li>
@@ -251,7 +251,7 @@
               <button type="button" id="btnFindDemo" class="ghost">Load demo</button>
               <input type="file" id="fileMosaic" accept="image/jpeg,image/png,image/tiff,.jpg,.jpeg,.png,.tif,.tiff" hidden />
             </div>
-            <p class="note" id="mosaicStatus">Already have one big stitched picture of the area? Tap I already have a map. It is uploaded once and reused for later searches.</p>
+            <p class="note" id="mosaicStatus">Already have one big stitched picture of the area? Tap I already have a map. It is uploaded once and reused for later searches. You can keep 4 maps; a new one replaces your oldest map.</p>
             <details class="more-info">
               <summary>More options</summary>
               <p class="note">If the file has no location built in, you can type the four corners of the area so we can give walking directions later. Enter west, south, east, and north, in that order.</p>
@@ -354,6 +354,6 @@
   <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.1</footer>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="js/app.js?v=20261114dlpm2"></script>
+  <script type="module" src="js/app.js?v=20261114dlpm3"></script>
 </body>
 </html>
