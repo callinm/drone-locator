@@ -12,8 +12,8 @@ import {
   clampAltitudeM,
   footprintWidthM,
   footprintHeightM,
-} from "./camera.js?v=20261114dlrr2";
-import { batteryModel, usableMissionMin } from "./battery.js?v=20261114dlrr2";
+} from "./camera.js?v=20261114dlpm1";
+import { batteryModel, usableMissionMin } from "./battery.js?v=20261114dlpm1";
 import {
   originOf,
   toLocal,
@@ -26,7 +26,7 @@ import {
   bearingDeg,
   polygonAreaM2,
   wrapDeg,
-} from "./geo.js?v=20261114dlrr2";
+} from "./geo.js?v=20261114dlpm1";
 
 export function defaultSettings(overrides = {}) {
   return {

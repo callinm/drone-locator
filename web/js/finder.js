@@ -2,11 +2,11 @@
  * Find My Drone — upload a mosaic once, send a query (region or photo)
  * to the server matcher, and draw the returned boxes / GPS points.
  */
-import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlrr2";
-import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlrr2";
-import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage, onAuthChange } from "./auth.js?v=20261114dlrr2";
-import { uploadAndStart, latestJob, getJob, cancelJob, startJob, MIN_PHOTOS } from "./photomap.js?v=20261114dlrr2";
-import { enqueue, putFindResults } from "./sync.js?v=20261114dlrr2";
+import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlpm1";
+import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlpm1";
+import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage, onAuthChange } from "./auth.js?v=20261114dlpm1";
+import { uploadAndStart, latestJob, getJob, cancelJob, startJob, MIN_PHOTOS } from "./photomap.js?v=20261114dlpm1";
+import { enqueue, putFindResults } from "./sync.js?v=20261114dlpm1";
 
 const MAX_PREVIEW = 2048;
 

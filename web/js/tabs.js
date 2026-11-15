@@ -1,4 +1,4 @@
-import { applyProductChrome, isLocator } from "./product.js?v=20261114dlrr2";
+import { applyProductChrome, isLocator } from "./product.js?v=20261114dlpm1";
 
 const VIEWS = {
   planner: { view: "viewPlanner", tab: "tabPlanner" },

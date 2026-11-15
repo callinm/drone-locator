@@ -2,7 +2,7 @@
  * Account sync for missions, planner settings, flight progress, and
  * optional Find My Drone results. Uses the signed-in Piletally session.
  */
-import { apiFetch, isAuthenticated } from "./auth.js?v=20261114dlrr2";
+import { apiFetch, isAuthenticated } from "./auth.js?v=20261114dlpm1";
 
 export const POLL_MS = 12000;
 export const CACHE_KEY = "drone-mapper-sync-cache";
