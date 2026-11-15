@@ -1,6 +1,6 @@
-import { generateGrid, defaultSettings } from "./grid.js?v=20261114dlpm1";
-import { FAA_MAX_ALTITUDE_M, CAMERAS, getCamera, MAVIC_AIR_2 } from "./camera.js?v=20261114dlpm1";
-import { PRESETS, presetSettings, presetStats } from "./presets.js?v=20261114dlpm1";
+import { generateGrid, defaultSettings } from "./grid.js?v=20261114dlpm2";
+import { FAA_MAX_ALTITUDE_M, CAMERAS, getCamera, MAVIC_AIR_2 } from "./camera.js?v=20261114dlpm2";
+import { PRESETS, presetSettings, presetStats } from "./presets.js?v=20261114dlpm2";
 
 const DRONE_KEY = "piletally_drone_model";
 
@@ -50,12 +50,12 @@ import {
   ftToM,
   mphToMps,
   mpsToMph,
-} from "./units.js?v=20261114dlpm1";
-import { initTutorial } from "./tutorial.js?v=20261114dlpm1";
-import { attachBasemap, refreshMapSize } from "./basemap.js?v=20261114dlpm1";
-import { evaluatePhotoCount, isStockpileMission } from "./photolimits.js?v=20261114dlpm1";
-import { initPageTabs, setPageTab, onPageTab } from "./tabs.js?v=20261114dlpm1";
-import { applyProductChrome, isLocator } from "./product.js?v=20261114dlpm1";
+} from "./units.js?v=20261114dlpm2";
+import { initTutorial } from "./tutorial.js?v=20261114dlpm2";
+import { attachBasemap, refreshMapSize } from "./basemap.js?v=20261114dlpm2";
+import { evaluatePhotoCount, isStockpileMission } from "./photolimits.js?v=20261114dlpm2";
+import { initPageTabs, setPageTab, onPageTab } from "./tabs.js?v=20261114dlpm2";
+import { applyProductChrome, isLocator } from "./product.js?v=20261114dlpm2";
 import {
   buildMission,
   toMissionJson,
@@ -64,10 +64,10 @@ import {
   parseMissionJson,
   planFromMission,
   suggestedFilename,
-} from "./export.js?v=20261114dlpm1";
-import { initSavedMissions } from "./saved-missions.js?v=20261114dlpm1";
-import { initAuthChrome, isAuthenticated, onAuthChange, currentUser } from "./auth.js?v=20261114dlpm1";
-import { enqueue, getSettings, putSettings, readCache, writeCache } from "./sync.js?v=20261114dlpm1";
+} from "./export.js?v=20261114dlpm2";
+import { initSavedMissions } from "./saved-missions.js?v=20261114dlpm2";
+import { initAuthChrome, isAuthenticated, onAuthChange, currentUser } from "./auth.js?v=20261114dlpm2";
+import { enqueue, getSettings, putSettings, readCache, writeCache } from "./sync.js?v=20261114dlpm2";
 
 // Public University of Illinois South Farms — demo only, not a real mission.
 const DEMO_POLYGON = [
@@ -583,10 +583,10 @@ syncDroneSelect();
 initAuthChrome();
 (async () => {
   if (isLocator()) {
-    const { initFinder } = await import("./finder.js?v=20261114dlpm1");
+    const { initFinder } = await import("./finder.js?v=20261114dlpm2");
     initFinder();
   } else {
-    const { initStockpile } = await import("./stockpile.js?v=20261114dlpm1");
+    const { initStockpile } = await import("./stockpile.js?v=20261114dlpm2");
     initStockpile();
   }
 })();

@@ -302,3 +302,12 @@ def test_second_active_job_is_refused_but_abandoned_upload_is_replaced(env):
     _wait_status(c, j2, {"queued"})
     r = c.post("/searchmaps")
     assert r.status_code == 409
+
+
+def test_full_map_store_is_refused_before_any_upload(env, monkeypatch):
+    c, node, user = env
+    import config, store
+    monkeypatch.setattr(store, "_mosaic_count", lambda owner: config.MAX_MOSAICS)
+    r = c.post("/searchmaps")
+    assert r.status_code == 409
+    assert "expire" in r.json()["detail"]

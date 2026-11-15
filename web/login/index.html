@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/app.css?v=20261114dlpm1" />
+  <link rel="stylesheet" href="../css/app.css?v=20261114dlpm2" />
 </head>
 <body class="auth-page">
   <div class="page-tabs">
@@ -34,7 +34,7 @@
     </form>
   </main>
   <script type="module">
-    import { initAuthChrome, isAuthenticated, login, plannerHref } from "../js/auth.js?v=20261114dlpm1";
+    import { initAuthChrome, isAuthenticated, login, plannerHref } from "../js/auth.js?v=20261114dlpm2";
     await initAuthChrome();
     if (isAuthenticated()) location.replace(plannerHref("home"));
     const form = document.getElementById("loginForm");

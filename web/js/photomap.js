@@ -3,7 +3,7 @@
  * Photos are shrunk on the device (EXIF/GPS kept), sent in small batches,
  * stitched on the server, and the result is loaded as the search map.
  */
-import { apiFetch } from "./auth.js?v=20261114dlpm1";
+import { apiFetch } from "./auth.js?v=20261114dlpm2";
 
 export const MAX_EDGE = 2048;
 export const BATCH = 8;
