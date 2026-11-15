@@ -34,7 +34,7 @@ test("locked locator tour does not point at hidden search controls", () => {
   const ids = LOCATOR_LOCKED_STEPS.map((s) => s.id);
   assert.deepEqual(ids, ["welcome", "signin", "how-it-works", "settings"]);
   for (const step of LOCATOR_LOCKED_STEPS) {
-    assert.ok(!["btnLoadMosaic", "btnLoadRef", "btnFindSearch", "btnDrawQuery"].includes(step.target));
+    assert.ok(!["btnPhotoMap", "btnLoadMosaic", "btnLoadRef", "btnFindSearch", "btnDrawQuery"].includes(step.target));
   }
   assert.equal(LOCATOR_LOCKED_STEPS[1].target, "locatorLockCard");
   assert.equal(LOCATOR_LOCKED_STEPS.at(-1).finish, true);

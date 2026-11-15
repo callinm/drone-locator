@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Drone Locator — Find a lost aircraft</title>
-  <meta name="description" content="Search a stitched map for a lost aircraft." />
+  <meta name="description" content="Turn your search-flight photos into a map and search it for a lost aircraft." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -15,7 +15,7 @@
   <div class="page-tabs" role="tablist" aria-label="Drone Locator sections">
     <div class="page-brand">
       <strong>Drone Locator</strong>
-      <span>Search a stitched map for a lost aircraft.</span>
+      <span>Turn your flight photos into a map and find a lost aircraft.</span>
     </div>
     <button type="button" id="btnHeaderMenu" class="header-menu-btn" aria-expanded="false" aria-controls="authChrome">&#9776; Menu</button>
     <button type="button" id="tabPlanner" role="tab" aria-selected="false">Planner</button>
@@ -228,11 +228,30 @@
           <section>
             <h2>1. Add your search map</h2>
             <div class="tools">
-              <button type="button" id="btnLoadMosaic" class="primary">Load a search map</button>
+              <button type="button" id="btnPhotoMap" class="primary">Make a map from my flight photos</button>
+              <input type="file" id="filePhotoMap" accept="image/jpeg,.jpg,.jpeg" multiple hidden />
+            </div>
+            <p class="note" id="photoMapNote">Pick all the photos from your search flight (straight-down photos with GPS, 5 to 200). Our server stitches them into one map, usually in 5 to 20 minutes. Your photos are deleted from our server as soon as the map is made.</p>
+            <div class="photomap" id="photoMapPanel" role="status" aria-live="polite" hidden>
+              <ol class="photomap-steps">
+                <li data-pm-step="upload"><span class="pm-dot" aria-hidden="true"></span><span class="pm-label">Upload photos</span><span class="pm-detail" data-pm-detail="upload"></span></li>
+                <li data-pm-step="match"><span class="pm-dot" aria-hidden="true"></span><span class="pm-label">Match photos</span><span class="pm-detail" data-pm-detail="match"></span></li>
+                <li data-pm-step="stitch"><span class="pm-dot" aria-hidden="true"></span><span class="pm-label">Stitch the map</span><span class="pm-detail" data-pm-detail="stitch"></span></li>
+                <li data-pm-step="load"><span class="pm-dot" aria-hidden="true"></span><span class="pm-label">Load the map</span><span class="pm-detail" data-pm-detail="load"></span></li>
+              </ol>
+              <div class="pm-bar" aria-hidden="true"><div class="pm-fill" id="photoMapFill"></div></div>
+              <p class="note" id="photoMapStatus"></p>
+              <div class="tools">
+                <button type="button" id="btnPhotoMapRetry" class="primary" hidden>Try again</button>
+                <button type="button" id="btnPhotoMapCancel" class="ghost" hidden>Cancel</button>
+              </div>
+            </div>
+            <div class="tools">
+              <button type="button" id="btnLoadMosaic" class="ghost">I already have a map</button>
               <button type="button" id="btnFindDemo" class="ghost">Load demo</button>
               <input type="file" id="fileMosaic" accept="image/jpeg,image/png,image/tiff,.jpg,.jpeg,.png,.tif,.tiff" hidden />
             </div>
-            <p class="note" id="mosaicStatus">Load a stitched map of the search area (one large photo of the ground). It is uploaded once and reused for later searches.</p>
+            <p class="note" id="mosaicStatus">Already have one big stitched picture of the area? Tap I already have a map. It is uploaded once and reused for later searches.</p>
             <details class="more-info">
               <summary>More options</summary>
               <p class="note">If the file has no location built in, you can type the four corners of the area so we can give walking directions later. Enter west, south, east, and north, in that order.</p>

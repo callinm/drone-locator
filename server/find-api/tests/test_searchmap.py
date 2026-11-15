@@ -105,8 +105,15 @@ class FakeNode:
             if t["code"] == 30:
                 return httpx.Response(200, json=["Running opensfm stage", "Not enough images to continue"])
             return httpx.Response(200, json=["Running dataset stage", "Running opensfm stage"])
-        if path.endswith("/download/orthophoto.tif"):
-            return httpx.Response(200, content=self.ortho.read_bytes())
+        if path.endswith("/download/all.zip"):
+            import zipfile
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w") as zf:
+                zf.writestr("odm_orthophoto/odm_orthophoto.tif", self.ortho.read_bytes())
+                zf.writestr("images.json", "[]")
+            return httpx.Response(200, content=buf.getvalue(), headers={"content-type": "application/zip"})
+        if "/download/" in path:
+            return httpx.Response(200, json={"error": "Invalid asset"})
         if path in ("/task/cancel", "/task/remove"):
             uid = request.content.decode().split("=", 1)[1]
             if uid in self.tasks:

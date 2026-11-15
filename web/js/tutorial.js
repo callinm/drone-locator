@@ -91,9 +91,9 @@ export const LOCATOR_STEPS = Object.freeze([
   },
   {
     id: "load-map",
-    title: "Load a search map",
-    body: "Tap Load a search map and choose a stitched photo of the ground where you flew. The map should show that photo on top of the satellite view.",
-    target: "btnLoadMosaic",
+    title: "Make your search map",
+    body: "Tap Make a map from my flight photos and pick all the photos from your search flight. We stitch them into one map and load it here; steps turn green as they finish. Already have one big picture of the area? Use I already have a map.",
+    target: "btnPhotoMap",
     tab: "find",
   },
   {
@@ -145,7 +145,7 @@ export const LOCATOR_LOCKED_STEPS = Object.freeze([
   {
     id: "how-it-works",
     title: "How a search works",
-    body: "Once it is turned on: load a stitched map of the search area, show us your drone by drawing a box or uploading a photo, tap Search, then use Navigate here to walk to the top match.",
+    body: "Once it is turned on: make a map from your search-flight photos, show us your drone by drawing a box or uploading a photo, tap Search, then use Navigate here to walk to the top match.",
     target: null,
   },
   {

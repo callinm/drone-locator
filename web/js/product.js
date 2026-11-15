@@ -35,7 +35,7 @@ export function productName() {
 
 export function productTagline() {
   return isLocator()
-    ? "Search a stitched map for a lost aircraft."
+    ? "Turn your flight photos into a map and find a lost aircraft."
     : "It counts what's in a pile.";
 }
 

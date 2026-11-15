@@ -640,7 +640,9 @@ def _tick_one(job: dict[str, Any]) -> None:
         odm_stage = None
         for m in _STAGE_RE.finditer(console):
             odm_stage = m.group(1)
-        stage, pct = "matching_photos", 8
+        # The console tail may not include a stage line; keep the last known stage then.
+        prev_stage = job.get("stage") if job.get("stage") in ("matching_photos", "making_map") else "matching_photos"
+        stage, pct = prev_stage, 8
         for name, user_stage, end in ODM_STAGES:
             if name == odm_stage:
                 stage, pct = user_stage, end
@@ -679,12 +681,7 @@ def _harvest(job: dict[str, Any]) -> None:
     work.mkdir(parents=True, exist_ok=True)
     tif = work / "orthophoto.tif"
     try:
-        with _client() as c:
-            with c.stream("GET", f"/task/{job['node_uuid']}/download/orthophoto.tif", timeout=600.0) as resp:
-                resp.raise_for_status()
-                with tif.open("wb") as fh:
-                    for chunk in resp.iter_bytes(1 << 20):
-                        fh.write(chunk)
+        fetch_orthophoto(job["node_uuid"], work, tif)
         jpeg, bounds, size = ortho_to_search_jpeg(tif, MAX_DIM)
         mosaic = store.save_mosaic(
             jpeg,
@@ -713,6 +710,36 @@ def _harvest(job: dict[str, Any]) -> None:
         job["id"], status="done", stage="done", progress_pct=100, mosaic_id=mosaic.id,
         finished_at=_now(), photos_deleted_at=_now(), node_uuid=None, staged_bytes=0,
     )
+
+
+ORTHO_IN_ZIP = "odm_orthophoto/odm_orthophoto.tif"
+
+
+def fetch_orthophoto(node_uuid: str, work: Path, dest: Path) -> None:
+    """NodeODX only serves all.zip; stream it to disk and pull out the orthophoto."""
+    import zipfile
+
+    zpath = work / "all.zip"
+    with _client() as c:
+        with c.stream("GET", f"/task/{node_uuid}/download/all.zip", timeout=900.0) as resp:
+            resp.raise_for_status()
+            ctype = resp.headers.get("content-type", "")
+            if "json" in ctype:
+                resp.read()
+                raise ValueError(f"map builder said: {resp.text[:120]}")
+            with zpath.open("wb") as fh:
+                for chunk in resp.iter_bytes(1 << 20):
+                    fh.write(chunk)
+    try:
+        with zipfile.ZipFile(zpath) as zf:
+            names = zf.namelist()
+            name = ORTHO_IN_ZIP if ORTHO_IN_ZIP in names else next((n for n in names if n.endswith("odm_orthophoto.tif")), None)
+            if not name:
+                raise ValueError("The map builder did not make an orthophoto.")
+            with zf.open(name) as src, dest.open("wb") as out:
+                shutil.copyfileobj(src, out, 1 << 20)
+    finally:
+        zpath.unlink(missing_ok=True)
 
 
 def ortho_to_search_jpeg(tif: Path, max_dim: int) -> tuple[bytes, tuple[float, float, float, float], tuple[int, int]]:

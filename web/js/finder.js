@@ -4,7 +4,8 @@
  */
 import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlrr2";
 import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlrr2";
-import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js?v=20261114dlrr2";
+import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage, onAuthChange } from "./auth.js?v=20261114dlrr2";
+import { uploadAndStart, latestJob, getJob, cancelJob, startJob, MIN_PHOTOS } from "./photomap.js?v=20261114dlrr2";
 import { enqueue, putFindResults } from "./sync.js?v=20261114dlrr2";
 
 const MAX_PREVIEW = 2048;
@@ -339,6 +340,7 @@ function clearQuery({ keepStatus = false } = {}) {
   if (document.getElementById("viewFind") && !document.getElementById("viewFind").hidden) {
     ensureFindMap();
   }
+  pmResume().catch((err) => logTechnical(err, "resume search map"));
 }
 
 function showRefPreview(src, caption) {
@@ -351,6 +353,24 @@ function showRefPreview(src, caption) {
   img.src = src;
   preview.appendChild(img);
   if (caption) setRefStatus(caption);
+}
+
+function applyLoadedMosaic(body, sourceNote) {
+  state.mosaicId = body.id;
+  state.mosaicMeta = body;
+  markMapLoaded(true);
+  state.matches = [];
+  const geo = body.georeferenced
+    ? "location data included" + (body.bounds ? ` (${body.bounds.west.toFixed(5)}, ${body.bounds.south.toFixed(5)})–(${body.bounds.east.toFixed(5)}, ${body.bounds.north.toFixed(5)})` : "")
+    : "no location data — add the area corners under More options and upload again if you want walking directions";
+  setMosaicStatus(sourceNote || (
+    `“${body.filename}” is on the server — ${body.width}×${body.height} px, ${geo}. ` +
+    `Later searches reuse this map so the file is not sent again.`
+  ));
+  if (body.bounds) fillBoundsInput(body.bounds);
+  setProgress("The map is on the server. Draw a box or upload a photo of your drone, then search.");
+  enableSearch();
+  syncFindMap();
 }
 
 async function uploadMosaic(file, bounds) {
@@ -381,21 +401,7 @@ async function uploadMosaic(file, bounds) {
     if (r.status >= 500 || r.status === 0) throw new Error(FINDER_DOWN);
     throw new Error(body.detail || "We could not read that file as a map. Use a JPG, PNG or TIFF picture of the ground under 250 MB.");
   }
-  state.mosaicId = body.id;
-  state.mosaicMeta = body;
-  markMapLoaded(true);
-  state.matches = [];
-  const geo = body.georeferenced
-    ? "location data included" + (body.bounds ? ` (${body.bounds.west.toFixed(5)}, ${body.bounds.south.toFixed(5)})–(${body.bounds.east.toFixed(5)}, ${body.bounds.north.toFixed(5)})` : "")
-    : "no location data — add the area corners under More options and upload again if you want walking directions";
-  setMosaicStatus(
-    `“${body.filename}” is on the server — ${body.width}×${body.height} px, ${geo}. ` +
-    `Later searches reuse this map so the file is not sent again.`
-  );
-  if (body.bounds) fillBoundsInput(body.bounds);
-  setProgress("The map is on the server. Draw a box or upload a photo of your drone, then search.");
-  enableSearch();
-  syncFindMap();
+  applyLoadedMosaic(body);
   return body;
 }
 
@@ -456,6 +462,7 @@ async function onRefFile(file) {
   if (document.getElementById("viewFind") && !document.getElementById("viewFind").hidden) {
     ensureFindMap();
   }
+  pmResume().catch((err) => logTechnical(err, "resume search map"));
 }
 
 async function runSearch() {
@@ -1049,6 +1056,269 @@ function renderNavigate() {
   bar.hidden = false;
 }
 
+
+/* ---------- Make a map from search-flight photos ---------- */
+
+const pm = { job: null, timer: null, cancelled: false, busy: false, loadedJob: null, resumed: false };
+const PM_STEPS = ["upload", "match", "stitch", "load"];
+
+function pmPanel(show) {
+  const panel = el("photoMapPanel");
+  if (panel) panel.hidden = !show;
+}
+
+/** states: {upload:"done"|"active"|"failed"|"", ...} */
+function pmRender(states, details, pct, text, kind) {
+  pmPanel(true);
+  const panel = el("photoMapPanel");
+  for (const step of PM_STEPS) {
+    const li = panel?.querySelector(`[data-pm-step="${step}"]`);
+    if (!li) continue;
+    li.className = states[step] ? `is-${states[step]}` : "";
+    const d = li.querySelector("[data-pm-detail]");
+    if (d) d.textContent = states[step] === "done" ? "Success" : (details[step] || "");
+  }
+  const fill = el("photoMapFill");
+  if (fill) {
+    fill.style.width = `${Math.max(2, Math.min(100, pct || 0))}%`;
+    fill.className = "pm-fill" + (kind === "success" ? " is-success" : kind === "error" ? " is-error" : "");
+  }
+  const st = el("photoMapStatus");
+  if (st) {
+    st.textContent = text || "";
+    st.className = kind === "success" ? "okbox success-box" : kind === "error" ? "errorbox" : "note";
+  }
+  if (panel) panel.classList.toggle("is-success", kind === "success");
+  const btn = el("btnPhotoMap");
+  if (btn) {
+    btn.classList.toggle("is-success", kind === "success");
+    btn.textContent = kind === "success" ? "\u2713 Map made \u2014 make another" : "Make a map from my flight photos";
+  }
+}
+
+function pmButtons({ retry = false, cancel = false } = {}) {
+  const r = el("btnPhotoMapRetry");
+  const c = el("btnPhotoMapCancel");
+  if (r) r.hidden = !retry;
+  if (c) c.hidden = !cancel;
+  const make = el("btnPhotoMap");
+  if (make) make.disabled = pm.busy;
+}
+
+function minutes(sec) {
+  const m = Math.floor((sec || 0) / 60);
+  return m < 1 ? "under a minute" : m === 1 ? "1 minute" : `${m} minutes`;
+}
+
+function pmRenderJob(job) {
+  const s = job.status;
+  const stage = job.stage;
+  const elapsed = job.elapsed_s ? ` (${minutes(job.elapsed_s)} so far)` : "";
+  const photos = `${job.photo_count} photo${job.photo_count === 1 ? "" : "s"}`;
+  if (s === "collecting" || s === "submitting") {
+    pmRender({ upload: "active" }, { upload: "sending to the map builder\u2026" }, job.progress_pct, `Sending ${photos} to the map builder\u2026`);
+  } else if (s === "queued") {
+    pmRender({ upload: "done", match: "active" }, { match: "waiting in line" }, job.progress_pct,
+      `Your ${photos} are on our server, waiting for the map builder. Another map is being made first.${elapsed} You can leave this page open, or come back later \u2014 the map will be here.`);
+  } else if ((s === "processing" && stage === "matching_photos")) {
+    pmRender({ upload: "done", match: "active" }, { match: `${job.progress_pct}%` }, job.progress_pct,
+      `Matching ${photos} to each other${elapsed}. A map usually takes 5 to 20 minutes. You can leave this page open, or come back later.`);
+  } else if (s === "processing") {
+    pmRender({ upload: "done", match: "done", stitch: "active" }, { stitch: `${job.progress_pct}%` }, job.progress_pct,
+      `Stitching the map${elapsed}. Almost there.`);
+  } else if (s === "finishing") {
+    pmRender({ upload: "done", match: "done", stitch: "done", load: "active" }, { load: "loading\u2026" }, 98, "Loading your map\u2026");
+  } else if (s === "done") {
+    pmRender({ upload: "done", match: "done", stitch: "done", load: "active" }, { load: "loading\u2026" }, 99, "Loading your map\u2026");
+  } else if (s === "failed") {
+    const failedStep = !job.started_at ? "upload" : (stage === "making_map" ? "stitch" : (stage === "finishing" ? "load" : "match"));
+    const states = {};
+    for (const step of PM_STEPS) {
+      if (step === failedStep) { states[step] = "failed"; break; }
+      states[step] = "done";
+    }
+    const extra = job.can_retry
+      ? " Your photos are still on our server, so Try again will not upload them again."
+      : " Tap Make a map from my flight photos to start over.";
+    pmRender(states, { [failedStep]: "failed" }, job.progress_pct, `${job.error || "The map could not be made."}${extra}`, "error");
+  } else if (s === "cancelled") {
+    pmPanel(false);
+  }
+  pmButtons({
+    retry: s === "failed" && !!job.can_retry,
+    cancel: ["collecting", "submitting", "queued", "processing"].includes(s) || (s === "failed" && !!job.can_retry),
+  });
+}
+
+function pmStopPolling() {
+  if (pm.timer) clearTimeout(pm.timer);
+  pm.timer = null;
+}
+
+function pmPoll(delay = 4000) {
+  pmStopPolling();
+  pm.timer = setTimeout(async () => {
+    if (!pm.job) return;
+    try {
+      const job = await getJob(pm.job.id);
+      pm.job = job;
+      await pmHandleJob(job);
+    } catch (err) {
+      logTechnical(err, "search map status");
+      // Network hiccup: keep the last state and try again a bit later.
+      pmPoll(10000);
+    }
+  }, delay);
+}
+
+async function pmHandleJob(job, { fromResume = false } = {}) {
+  pmRenderJob(job);
+  if (job.status === "done" && job.mosaic_id) {
+    pm.busy = false;
+    pmStopPolling();
+    if (pm.loadedJob === job.id && state.mosaicId === job.mosaic_id) {
+      pmShowSuccess(job);
+      return;
+    }
+    await pmLoadResult(job, fromResume);
+    return;
+  }
+  if (["collecting", "submitting", "queued", "processing", "finishing"].includes(job.status)) {
+    if (job.status === "collecting" && fromResume) {
+      // An upload from another visit never finished; it cannot be resumed from here.
+      pmPanel(false);
+      return;
+    }
+    pm.busy = true;
+    pmButtons({ cancel: true });
+    pmPoll();
+    return;
+  }
+  pm.busy = false;
+  pmButtons({ retry: job.status === "failed" && !!job.can_retry, cancel: job.status === "failed" && !!job.can_retry });
+}
+
+function pmShowSuccess(job) {
+  const took = job.elapsed_s ? ` in ${minutes(job.elapsed_s)}` : "";
+  pmRender({ upload: "done", match: "done", stitch: "done", load: "done" }, {}, 100,
+    `\u2713 Success \u2014 your search map is loaded (made from ${job.photo_count} photos${took}). Your flight photos were deleted from our server. Next: step 2, show us your drone.`,
+    "success");
+  pmButtons({});
+}
+
+async function pmLoadResult(job, quiet) {
+  try {
+    const r = await apiFetch(`/mosaics/${job.mosaic_id}`);
+    if (r.status === 404) {
+      if (quiet) { pmPanel(false); return; }
+      throw new Error("Your map from this flight has expired (maps are kept for 12 hours). Make a new one from your photos.");
+    }
+    if (!r.ok) throw new Error(await readApiError(r, FINDER_DOWN));
+    const body = await r.json();
+    setPageTab("find");
+    clearQuery({ keepStatus: true });
+    applyLoadedMosaic(body, `Your search map is loaded: made from ${job.photo_count} flight photos, ${body.width}\u00d7${body.height} px, with GPS so matches get walking directions. It stays on the server for 12 hours.`);
+    try {
+      await fetchServerPreview();
+    } catch (err) {
+      logTechnical(err, "search map preview");
+    }
+    syncFindMap();
+    pm.loadedJob = job.id;
+    pmShowSuccess(job);
+    setProgress("Your map is loaded. Next, draw a box around your drone on the map or upload a photo of it, then tap Search.");
+  } catch (err) {
+    pmRender({ upload: "done", match: "done", stitch: "done", load: "failed" }, { load: "failed" }, 99,
+      friendlyError(err, FINDER_DOWN), "error");
+    pmButtons({});
+  }
+}
+
+async function onPhotoMapFiles(files) {
+  setError("");
+  setWarn("");
+  if (!isAuthenticated()) { setError(SIGNED_OUT); return; }
+  if (!isMosaicEnabled()) { setError(lockMessage().body); return; }
+  if (pm.busy) return;
+  pm.busy = true;
+  pm.cancelled = false;
+  pmStopPolling();
+  pmButtons({ cancel: true });
+  const total = files.length;
+  pmRender({ upload: "active" }, { upload: `0 of ${total}` }, 1, `Getting ${total} photos ready\u2026 Keep this page open until the upload finishes.`);
+  try {
+    const job = await uploadAndStart(files, (u) => {
+      pm.job = u.job;
+      const pct = Math.round(1 + (4 * u.done) / Math.max(1, u.total));
+      const skipped = (u.job && u.job.skipped && u.job.skipped.length) ? ` ${u.job.skipped.length} skipped (no GPS or not a drone photo).` : "";
+      pmRender({ upload: "active" }, { upload: `${u.done} of ${u.total}` }, pct,
+        `Uploading photos: ${u.done} of ${u.total}.${skipped} Keep this page open until the upload finishes.`);
+    }, () => pm.cancelled);
+    pm.job = job;
+    await pmHandleJob(job);
+  } catch (err) {
+    pm.busy = false;
+    if (pm.cancelled) { pmPanel(false); pmButtons({}); return; }
+    const plain = !err.status ? !/HTTP \d|fetch|network/i.test(err.message || "") : [400, 409, 413, 507].includes(err.status);
+    const msg = plain && err.message ? err.message : friendlyError(err, FINDER_DOWN);
+    const job = pm.job;
+    if (job && job.id) {
+      try {
+        const fresh = await getJob(job.id);
+        if (fresh.status === "collecting" && fresh.gps_count < MIN_PHOTOS) {
+          await cancelJob(job.id).catch(() => {});
+        }
+      } catch { /* ignore */ }
+    }
+    pmRender({ upload: "failed" }, { upload: "failed" }, 2, msg, "error");
+    pmButtons({});
+  }
+}
+
+async function onPhotoMapRetry() {
+  if (!pm.job || pm.busy) return;
+  pm.busy = true;
+  pmButtons({ cancel: true });
+  try {
+    const job = await startJob(pm.job.id);
+    pm.job = job;
+    await pmHandleJob(job);
+  } catch (err) {
+    pm.busy = false;
+    pmRender({ upload: "done", match: "failed" }, {}, pm.job.progress_pct || 5, friendlyError(err, FINDER_DOWN), "error");
+    pmButtons({ retry: true, cancel: true });
+  }
+}
+
+async function onPhotoMapCancel() {
+  pm.cancelled = true;
+  pmStopPolling();
+  if (pm.job && pm.job.id) {
+    try { await cancelJob(pm.job.id); } catch (err) { logTechnical(err, "cancel search map"); }
+  }
+  pm.busy = false;
+  pm.job = null;
+  pmPanel(false);
+  pmButtons({});
+  setProgress("Cancelled. Your photos were removed from our server.");
+}
+
+async function pmResume() {
+  if (pm.resumed || !isMosaicEnabled()) return;
+  pm.resumed = true;
+  const job = await latestJob();
+  if (!job) return;
+  pm.job = job;
+  if (job.status === "done") {
+    // Reload a map finished while the page was closed (it stays 12 hours).
+    if (!state.mosaicId && job.mosaic_id) await pmHandleJob(job, { fromResume: true });
+    return;
+  }
+  if (job.status === "cancelled") return;
+  if (job.status === "failed" && !job.can_retry) return;
+  await pmHandleJob(job, { fromResume: true });
+}
+
 export async function initFinder() {
   state.apiBase = apiBase();
   onPageTab((name) => {
@@ -1060,6 +1330,15 @@ export async function initFinder() {
     }
   });
   el("btnLoadMosaic")?.addEventListener("click", () => el("fileMosaic")?.click());
+  el("btnPhotoMap")?.addEventListener("click", () => el("filePhotoMap")?.click());
+  el("filePhotoMap")?.addEventListener("change", (ev) => {
+    const files = ev.target.files ? Array.from(ev.target.files) : [];
+    ev.target.value = "";
+    if (files.length) onPhotoMapFiles(files);
+  });
+  el("btnPhotoMapRetry")?.addEventListener("click", () => onPhotoMapRetry());
+  el("btnPhotoMapCancel")?.addEventListener("click", () => onPhotoMapCancel());
+  onAuthChange(() => { pmResume().catch((err) => logTechnical(err, "resume search map")); });
   el("fileMosaic")?.addEventListener("change", (ev) => {
     const file = ev.target.files && ev.target.files[0];
     ev.target.value = "";
@@ -1092,4 +1371,5 @@ export async function initFinder() {
   if (document.getElementById("viewFind") && !document.getElementById("viewFind").hidden) {
     ensureFindMap();
   }
+  pmResume().catch((err) => logTechnical(err, "resume search map"));
 }
