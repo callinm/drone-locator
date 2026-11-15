@@ -49,4 +49,5 @@ async def main():
             await pg.screenshot(path=f"{OUT}/live-{name}-3-demo.png")
             await ctx.close()
         await b.close()
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

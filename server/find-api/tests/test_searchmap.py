@@ -216,6 +216,7 @@ def test_success_makes_a_georeferenced_map_and_deletes_photos(env):
     assert j["stage_text"] == "Success" and j["progress_pct"] == 100
     assert j["photos_deleted"] is True
     assert not photos.exists()
+    assert not searchmap._job_dir(user.id, jid).exists()  # manifest and scratch gone too
     assert node.tasks[uid]["removed"] is True
     m = c.get(f"/mosaics/{j['mosaic_id']}").json()
     assert m["georeferenced"] is True
@@ -273,14 +274,14 @@ def test_cancel_deletes_photos_and_ttl_expires_failed(env, monkeypatch):
     jid = c.post("/searchmaps").json()["id"]
     _upload(c, jid, 5)
     j = c.post(f"/searchmaps/{jid}/cancel").json()
-    assert j["status"] == "cancelled" and not searchmap._photos_dir(user.id, jid).exists()
+    assert j["status"] == "cancelled" and not searchmap._job_dir(user.id, jid).exists()
 
     jid2 = c.post("/searchmaps").json()["id"]
     _upload(c, jid2, 5)
     searchmap._update(jid2, status="failed", stage="failed")
     assert searchmap.cleanup(now=time.time() + 60) == 0
     assert searchmap.cleanup(now=time.time() + searchmap.TTL_SECONDS + 60) == 1
-    assert not searchmap._photos_dir(user.id, jid2).exists()
+    assert not searchmap._job_dir(user.id, jid2).exists()
 
 
 def test_store_cleanup_never_touches_searchmap_staging(env):

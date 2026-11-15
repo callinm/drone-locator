@@ -206,11 +206,15 @@ def staging_bytes() -> int:
 
 
 def delete_photos(job: dict[str, Any]) -> None:
-    """Remove a job's staged photos (never anything outside its own folder)."""
-    d = _photos_dir(job["user_id"], job["id"])
+    """Remove a job's staging folder: photos, manifest, scratch (never anything outside it)."""
+    d = _job_dir(job["user_id"], job["id"])
     base = root().resolve()
     if d.exists() and base in d.resolve().parents:
         shutil.rmtree(d, ignore_errors=True)
+    try:
+        d.parent.rmdir()  # the user's folder, only if now empty
+    except OSError:
+        pass
 
 
 def public_view(job: dict[str, Any]) -> dict[str, Any]:
