@@ -1,6 +1,7 @@
 """Photo-to-search-map flow against a fake NodeODX (no network, no WebODM)."""
 import io
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -80,9 +81,15 @@ class FakeNode:
         if path == "/info":
             return httpx.Response(200, json={"taskQueueCount": 0, "maxParallelTasks": 1})
         if path == "/task/new/init":
+            # Like NodeODX (multer): only multipart bodies are parsed.
+            if "multipart/form-data" not in request.headers.get("content-type", ""):
+                opts = []
+            else:
+                body = request.content.decode("latin1")
+                m = re.search(r'name="options"\r\n\r\n(.*?)\r\n--', body, re.S)
+                opts = json.loads(m.group(1)) if m else []
             uid = f"u{len(self.tasks) + 1}"
-            body = request.content.decode("latin1")
-            self.tasks[uid] = {"code": 0, "images": 0, "init": body, "removed": False}
+            self.tasks[uid] = {"code": 0, "images": 0, "options": opts, "removed": False}
             return httpx.Response(200, json={"uuid": uid})
         if path.startswith("/task/new/upload/"):
             uid = path.rsplit("/", 1)[1]
@@ -98,7 +105,7 @@ class FakeNode:
             t = self.tasks.get(uid)
             if not t:
                 return httpx.Response(200, json={"error": "not found"})
-            return httpx.Response(200, json={"status": {"code": t["code"]}, "progress": t.get("progress", 0)})
+            return httpx.Response(200, json={"status": {"code": t["code"]}, "progress": t.get("progress", 0), "options": t["options"]})
         if path.endswith("/output"):
             uid = path.split("/")[2]
             t = self.tasks[uid]
@@ -190,8 +197,7 @@ def test_success_makes_a_georeferenced_map_and_deletes_photos(env):
     j = _wait_status(c, jid, {"queued", "failed"})
     assert j["status"] == "queued", j
     uid = next(iter(node.tasks))
-    opts = json.loads(httpx.QueryParams(node.tasks[uid]["init"]).get("options"))
-    names = {o["name"]: o["value"] for o in opts}
+    names = {o["name"]: o["value"] for o in node.tasks[uid]["options"]}
     assert names["fast-orthophoto"] is True and names["skip-3dmodel"] is True
     assert names["orthophoto-resolution"] >= 2.0
     assert node.tasks[uid]["images"] == 6

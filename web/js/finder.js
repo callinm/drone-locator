@@ -1064,7 +1064,12 @@ const PM_STEPS = ["upload", "match", "stitch", "load"];
 
 function pmPanel(show) {
   const panel = el("photoMapPanel");
-  if (panel) panel.hidden = !show;
+  if (!panel) return;
+  const wasHidden = panel.hidden;
+  panel.hidden = !show;
+  if (show && wasHidden && typeof panel.scrollIntoView === "function") {
+    try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* old browsers */ }
+  }
 }
 
 /** states: {upload:"done"|"active"|"failed"|"", ...} */

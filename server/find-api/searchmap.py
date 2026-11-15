@@ -543,12 +543,14 @@ def _submit(job_id: str) -> None:
     node_uuid = None
     try:
         with _client() as c:
+            # NodeODX parses /task/new/init with multer: it must be multipart/form-data,
+            # or the options are silently dropped and a full default reconstruction runs.
             r = c.post(
                 "/task/new/init",
-                data={
-                    "name": f"dl-searchmap-{job_id[:12]}",
-                    "options": json.dumps(job.get("options") or []),
-                    "skipPostProcessing": "true",
+                files={
+                    "name": (None, f"dl-searchmap-{job_id[:12]}"),
+                    "options": (None, json.dumps(job.get("options") or [])),
+                    "skipPostProcessing": (None, "true"),
                 },
             )
             r.raise_for_status()
@@ -571,6 +573,11 @@ def _submit(job_id: str) -> None:
             r.raise_for_status()
             if "error" in (r.json() or {}):
                 raise SearchMapError(502, str(r.json()["error"])[:200])
+            # The task only exists after commit; make sure the light settings were applied.
+            check = c.get(f"/task/{node_uuid}/info")
+            applied = {o.get("name"): o.get("value") for o in (check.json() or {}).get("options", [])} if check.status_code == 200 else {}
+            if applied.get("fast-orthophoto") not in (True, "true"):
+                raise SearchMapError(502, "map builder ignored the light settings")
         _update(job_id, status="queued", stage="queued", progress_pct=5, stage_started_at=_now())
     except Exception as exc:
         if node_uuid:
