@@ -2,10 +2,10 @@
  * Find My Drone — upload a mosaic once, send a query (region or photo)
  * to the server matcher, and draw the returned boxes / GPS points.
  */
-import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js";
-import { setPageTab, onPageTab } from "./tabs.js";
-import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js?v=20261114fix2";
-import { enqueue, putFindResults } from "./sync.js";
+import { attachBasemap, refreshMapSize, locateOrFallback } from "./basemap.js?v=20261114dlrr1";
+import { setPageTab, onPageTab } from "./tabs.js?v=20261114dlrr1";
+import { apiFetch, apiBase as authApiBase, isMosaicEnabled, isAuthenticated, lockMessage } from "./auth.js?v=20261114dlrr1";
+import { enqueue, putFindResults } from "./sync.js?v=20261114dlrr1";
 
 const MAX_PREVIEW = 2048;
 
@@ -36,7 +36,12 @@ function apiBase() {
   return authApiBase();
 }
 
-const FINDER_DOWN = "The finder is down right now. Try again in a few minutes.";
+const FINDER_DOWN = "Something went wrong on our side, so the finder could not answer. Your files are fine. Wait a few minutes and try again; if it keeps happening, send us a note from Account Settings.";
+const SIGNED_OUT = "You are not signed in. Log in at the top of the page, then try again.";
+const SESSION_EXPIRED = "Your sign-in has expired. Log out and log in again, then try again.";
+function signInMessage() {
+  return isAuthenticated() ? SESSION_EXPIRED : SIGNED_OUT;
+}
 const DEFAULT_REF_STATUS = "On a phone, tap Draw box, then drag on the map. On a computer, tap Draw box or hold Shift and drag. Or upload a close-up photo of your drone or a marking on it.";
 
 function logTechnical(err, context) {
@@ -52,13 +57,13 @@ function friendlyError(err, fallback = FINDER_DOWN) {
   logTechnical(err, "Drone Locator");
   if (!raw) return fallback;
   const lower = raw.toLowerCase();
-  if (/sign in|log in|not authenticated|401/.test(lower)) return "Sign in to use Drone Locator.";
+  if (/not authenticated|401|^log in or create/.test(lower)) return signInMessage();
   if (/locked|403|enable mapping|enable drone locator/.test(lower)) return lockMessage().body;
   if (/four numbers|west, south/.test(lower)) {
     return "The area corners need four numbers: west, south, east, and north.";
   }
-  if (/upload failed|could not encode/.test(lower)) {
-    return "Could not load that map. Try a different file, or try again in a few minutes.";
+  if (/upload failed|could not encode|cannot decode|could not decode|unsupported|too large|too big/.test(lower)) {
+    return "We could not read that file as a map. Use a JPG, PNG or TIFF picture of the ground under 250 MB.";
   }
   if (/match failed|search cannot start|matcher service/.test(lower)) return FINDER_DOWN;
   if (/http \d+/.test(lower) || /127\.0\.0\.1|localhost|\/drone-mapper\/api/.test(lower)) return fallback;
@@ -75,7 +80,7 @@ async function readApiError(res, fallback) {
   const technical = detail || `HTTP ${res.status}`;
   logTechnical(technical, "Drone Locator API");
   if (res.status === 403) return lockMessage().body;
-  if (res.status === 401) return "Sign in to use Drone Locator.";
+  if (res.status === 401) return signInMessage();
   return friendlyError(new Error(technical), fallback || FINDER_DOWN);
 }
 
@@ -84,6 +89,17 @@ function setBox(id, msg) {
   if (!box) return;
   box.hidden = !msg;
   box.textContent = msg || "";
+  if (msg && typeof box.scrollIntoView === "function") {
+    try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* old browsers */ }
+  }
+}
+
+/** Phones: keep the map short until a search map exists, then give it most of the screen. */
+function markMapLoaded(on) {
+  const app = el("findApp");
+  if (!app) return;
+  app.classList.toggle("has-search-map", !!on);
+  if (state.map) setTimeout(() => refreshMapSize(state.map), 60);
 }
 
 function setError(msg) { setBox("findError", msg); }
@@ -285,10 +301,24 @@ function redrawOverlay() {
   });
 }
 
+export function searchBlocker(s) {
+  const hasQuery = !!(s.queryFile || (s.queryRect && s.queryRect.w >= 8 && s.queryRect.h >= 8));
+  if (s.apiOk === false) return "Search is off because the finder is not answering right now. Wait a few minutes, then refresh the page.";
+  if (!s.mosaicId && !hasQuery) return "Search turns on after step 1 (load a search map) and step 2 (draw a box or upload a photo of your drone).";
+  if (!s.mosaicId) return "Search turns on after step 1: load a search map.";
+  if (!hasQuery) return "Search turns on after step 2: draw a box around your drone on the map, or upload a photo of it.";
+  return "";
+}
+
 function enableSearch() {
-  const ready = !!(state.mosaicId && (state.queryFile || (state.queryRect && state.queryRect.w >= 8 && state.queryRect.h >= 8)));
+  const reason = searchBlocker(state);
   const btn = el("btnFindSearch");
-  if (btn) btn.disabled = !ready || state.apiOk === false;
+  if (btn) btn.disabled = !!reason;
+  const hint = el("findSearchHint");
+  if (hint) {
+    hint.hidden = !reason;
+    hint.textContent = reason;
+  }
 }
 
 function clearQuery({ keepStatus = false } = {}) {
@@ -324,6 +354,9 @@ function showRefPreview(src, caption) {
 }
 
 async function uploadMosaic(file, bounds) {
+  if (!isAuthenticated()) {
+    throw new Error(SIGNED_OUT);
+  }
   if (!isMosaicEnabled()) {
     throw new Error(lockMessage().body);
   }
@@ -343,10 +376,14 @@ async function uploadMosaic(file, bounds) {
   const body = await r.json().catch(() => ({}));
   if (!r.ok) {
     logTechnical(body.detail || `Upload failed (${r.status})`, "map upload");
-    throw new Error(body.detail || "Could not load that map. Try a different file, or try again in a few minutes.");
+    if (r.status === 401) throw new Error(signInMessage());
+    if (r.status === 403) throw new Error(lockMessage().body);
+    if (r.status >= 500 || r.status === 0) throw new Error(FINDER_DOWN);
+    throw new Error(body.detail || "We could not read that file as a map. Use a JPG, PNG or TIFF picture of the ground under 250 MB.");
   }
   state.mosaicId = body.id;
   state.mosaicMeta = body;
+  markMapLoaded(true);
   state.matches = [];
   const geo = body.georeferenced
     ? "location data included" + (body.bounds ? ` (${body.bounds.west.toFixed(5)}, ${body.bounds.south.toFixed(5)})–(${body.bounds.east.toFixed(5)}, ${body.bounds.north.toFixed(5)})` : "")
@@ -401,8 +438,8 @@ async function onMosaicFile(file) {
       if (!w) setWarn(err.message);
     }
   } catch (err) {
-    setError(friendlyError(err, "Could not load that map. Try a different file, or try again in a few minutes."));
-    setProgress("The map did not upload. Try again in a few minutes.");
+    setError(friendlyError(err, FINDER_DOWN));
+    setProgress("Step 1 is not done: no search map is loaded yet. Fix the problem shown below, then load the map again.");
   }
   redrawOverlay();
 }
@@ -412,7 +449,9 @@ async function onRefFile(file) {
   clearQuery({ keepStatus: true });
   state.queryFile = file;
   state.queryUrl = URL.createObjectURL(file);
-  showRefPreview(state.queryUrl, `“${file.name}” will be used in the next search. Your map stays on the server.`);
+  showRefPreview(state.queryUrl, state.mosaicId
+    ? `“${file.name}” will be used in the next search. Tap Search in step 3.`
+    : `“${file.name}” is ready. Next, load a search map in step 1, then tap Search.`);
   enableSearch();
   if (document.getElementById("viewFind") && !document.getElementById("viewFind").hidden) {
     ensureFindMap();
@@ -513,7 +552,7 @@ async function runSearch() {
     }
   } catch (err) {
     setError(friendlyError(err, FINDER_DOWN));
-    setProgress("The search did not finish. Try again in a few minutes.");
+    setProgress("The search did not finish. The reason is shown below.");
   } finally {
     enableSearch();
   }

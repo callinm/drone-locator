@@ -1,4 +1,4 @@
-import { isLocator } from "./product.js";
+import { isLocator } from "./product.js?v=20261114dlrr1";
 /**
  * Session helper shared by the planner and the login / signup / settings / admin pages.
  */
@@ -285,30 +285,106 @@ export function lockMessage(feature) {
   };
 }
 
+function accessRequestKey() {
+  const name = state.user && state.user.username ? state.user.username : "";
+  return name ? `dl_access_requested_${name}` : "";
+}
+
+function readAccessRequestedAt() {
+  try {
+    const key = accessRequestKey();
+    return key ? window.localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAccessRequestedAt(iso) {
+  try {
+    const key = accessRequestKey();
+    if (key) window.localStorage.setItem(key, iso);
+  } catch {
+    /* private mode: the on-screen confirmation is still shown */
+  }
+}
+
+function formatRequestTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function showAccessSent(root, iso, justNow) {
+  const btn = root.querySelector("[data-lock-request]");
+  const status = root.querySelector("[data-lock-request-status]");
+  const panel = root.querySelector("[data-lock-request-panel]");
+  if (panel) panel.hidden = true;
+  if (status) {
+    status.hidden = false;
+    status.className = "okbox success-box";
+    const when = formatRequestTime(iso);
+    status.textContent = justNow
+      ? `\u2713 Success \u2014 your request was sent${when ? ` (${when})` : ""}. An admin will review it and turn on Drone Locator for your account. When it is on, this lock goes away the next time you open or refresh this page.`
+      : `\u2713 You already sent a request${when ? ` (${when})` : ""}. An admin will review it. Refresh this page later to check. If you need to add a phone number or email, tap Send another request.`;
+  }
+  if (btn) {
+    btn.hidden = false;
+    btn.disabled = false;
+    btn.classList.toggle("is-success", !!justNow);
+    btn.textContent = justNow ? "\u2713 Request sent" : "Send another request";
+    if (justNow) btn.disabled = true;
+  }
+}
+
 function bindRequestAccess(root) {
   const btn = root.querySelector("[data-lock-request]");
   if (!btn || btn.dataset.bound) return;
   btn.dataset.bound = "1";
-  btn.addEventListener("click", async () => {
-    const status = root.querySelector("[data-lock-request-status]");
-    btn.disabled = true;
+  const panel = root.querySelector("[data-lock-request-panel]");
+  const confirmBtn = root.querySelector("[data-lock-request-confirm]");
+  const cancelBtn = root.querySelector("[data-lock-request-cancel]");
+  const contact = root.querySelector("[data-lock-request-contact]");
+  const status = root.querySelector("[data-lock-request-status]");
+  btn.addEventListener("click", () => {
+    // First tap only opens a confirmation; nothing is sent yet.
+    if (status) status.hidden = true;
+    if (panel) {
+      panel.hidden = false;
+      btn.hidden = true;
+      (confirmBtn || contact)?.focus();
+    }
+  });
+  cancelBtn?.addEventListener("click", () => {
+    if (panel) panel.hidden = true;
+    btn.hidden = false;
+    btn.focus();
+  });
+  confirmBtn?.addEventListener("click", async () => {
+    confirmBtn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
     if (status) {
       status.hidden = false;
-      status.textContent = "Sending your request…";
+      status.textContent = "Sending your request\u2026";
       status.className = "okbox";
     }
+    const note = contact && contact.value.trim() ? ` Contact: ${contact.value.trim().slice(0, 120)}` : "";
     try {
-      await sendFeedback(`${ACCESS_REQUEST_PREFIX} Please turn on Drone Locator for my account.`);
-      if (status) {
-        status.textContent = "Your request was sent. An admin will review it and turn on Drone Locator for your account.";
-      }
-      btn.textContent = "Request sent";
+      await sendFeedback(`${ACCESS_REQUEST_PREFIX} Please turn on Drone Locator for my account.${note}`);
+      const iso = new Date().toISOString();
+      writeAccessRequestedAt(iso);
+      showAccessSent(root, iso, true);
     } catch (err) {
-      btn.disabled = false;
       if (status) {
         status.className = "errorbox";
-        status.textContent = err.message || "Could not send the request. Try again in a few minutes.";
+        status.textContent = (err && err.message && err.message.length < 160 ? err.message + " " : "") +
+          "Your request was not sent. Check your internet connection, then tap Send request again.";
       }
+    } finally {
+      confirmBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
     }
   });
 }
@@ -328,8 +404,21 @@ export function applyMosaicLock() {
     if (login) login.hidden = !!state.user;
     if (signup) signup.hidden = !!state.user;
     const request = el.querySelector("[data-lock-request]");
-    if (request) request.hidden = !(state.user && locked);
+    const panel = el.querySelector("[data-lock-request-panel]");
+    const canRequest = !!(state.user && locked);
+    if (!canRequest) {
+      if (panel) panel.hidden = true;
+      const st = el.querySelector("[data-lock-request-status]");
+      if (st) st.hidden = true;
+      delete el.dataset.sentShownFor;
+    }
+    if (request) request.hidden = !canRequest || !!(panel && !panel.hidden);
     bindRequestAccess(el);
+    if (canRequest && el.dataset.sentShownFor !== state.user.username) {
+      el.dataset.sentShownFor = state.user.username;
+      const prior = readAccessRequestedAt();
+      if (prior) showAccessSent(el, prior, false);
+    }
   });
   document.querySelectorAll("[data-requires-mosaic]").forEach((el) => {
     if ("disabled" in el) el.disabled = locked;

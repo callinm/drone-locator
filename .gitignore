@@ -4,3 +4,4 @@ live-ui/
 screenshots/*.png
 __pycache__/
 .DS_Store
+web/vendor/

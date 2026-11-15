@@ -10,8 +10,8 @@
  * The result is an estimated WGS84 point plus the east/north offset from the
  * camera. Lens distortion is not modelled; the ground is assumed flat.
  */
-import { computeFovDeg, MAVIC_AIR_2 } from "./camera.js";
-import { toLatLon, toRad } from "./geo.js";
+import { computeFovDeg, MAVIC_AIR_2 } from "./camera.js?v=20261114dlrr1";
+import { toLatLon, toRad } from "./geo.js?v=20261114dlrr1";
 
 export function cameraIntrinsics(imageWidth, imageHeight, camera = MAVIC_AIR_2) {
   const w = imageWidth || camera.imageWidthPx;

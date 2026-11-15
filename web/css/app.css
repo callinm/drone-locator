@@ -1199,3 +1199,102 @@ a.btn[hidden],
 .btn[hidden] {
   display: none !important;
 }
+
+/* Re-review fixes (Nov 14 PM): phone header menu, map height, 44px controls, access request confirm */
+.header-menu-btn { display: none; }
+.search-hint { margin-top: 6px; }
+.success-box,
+html[data-product="locator"] .success-box {
+  color: #eafff2;
+  background: rgba(31, 138, 76, 0.22);
+  border: 1px solid #1f8a4c;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+.lock-confirm {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.lock-confirm p { margin: 0 0 10px; }
+.lock-note-label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; margin-bottom: 10px; }
+.lock-note-label input { min-height: 44px; font-size: 16px; width: 100%; box-sizing: border-box; }
+
+/* 44px touch targets for the remaining small controls */
+#viewFind input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  flex-shrink: 0;
+}
+#viewFind .color-tools label { min-height: 44px; }
+#viewFind input[type="number"],
+#viewFind input[type="text"],
+#viewFind select {
+  min-height: 44px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+#viewFind input[type="number"] { width: 6.5em !important; }
+#viewFind .bounds-label { display: flex; flex-direction: column; gap: 6px; }
+#viewFind .bounds-label input { width: 100%; }
+
+@media (max-width: 600px) {
+  .page-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .page-brand {
+    flex: 1 0 calc(100% - 120px);
+    margin-right: 0;
+    padding-right: 0;
+    min-width: 0;
+  }
+  .page-brand span { display: none; }
+  .header-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 96px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .header-menu-btn[aria-expanded="true"] { border-color: var(--accent); }
+  .page-tabs > button[role="tab"] {
+    flex: 1 1 0;
+    min-width: 25%;
+    padding: 8px 4px;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .page-tabs > .auth-chrome {
+    display: none;
+    flex: 1 0 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    border-top: 1px solid var(--line);
+    padding-top: 4px;
+  }
+  .page-tabs.menu-open > .auth-chrome { display: flex; }
+  #authSignedIn:not([hidden]),
+  #authSignedOut:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+
+  /* Map: short until a search map is loaded so the steps are on screen,
+     then most of the screen once there is something to search. */
+  #findApp { grid-template-rows: 30vh 1fr; }
+  #findApp.has-search-map { grid-template-rows: 60vh 1fr; }
+}

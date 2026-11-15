@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/app.css?v=20261114fix2" />
+  <link rel="stylesheet" href="../css/app.css?v=20261114dlrr1" />
 </head>
 <body class="auth-page">
   <div class="page-tabs">
@@ -39,7 +39,7 @@
     </form>
   </main>
   <script type="module">
-    import { applyProductChrome, isLocator, productName } from "../js/product.js";
+    import { applyProductChrome, isLocator, productName } from "../js/product.js?v=20261114dlrr1";
     applyProductChrome();
     const lead = document.querySelector("p.lead");
     if (lead && isLocator()) {
@@ -47,7 +47,7 @@
       document.title = "Create an account — Drone Locator";
     }
 
-    import { initAuthChrome, isAuthenticated, signup, plannerHref } from "../js/auth.js?v=20261114fix2";
+    import { initAuthChrome, isAuthenticated, signup, plannerHref } from "../js/auth.js?v=20261114dlrr1";
     await initAuthChrome();
     if (isAuthenticated()) location.replace(plannerHref("home"));
     const form = document.getElementById("signupForm");

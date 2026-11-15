@@ -1,5 +1,5 @@
-import { isLocator, productName } from "./product.js";
-import { isMosaicEnabled } from "./auth.js?v=20261114fix2";
+import { isLocator, productName } from "./product.js?v=20261114dlrr1";
+import { isMosaicEnabled } from "./auth.js?v=20261114dlrr1";
 /**
  * First-run guided tour: a pop-up bubble, a spotlight, and an arrow
  * pointing at the control to click. Completion is stored locally and
@@ -247,6 +247,23 @@ function escapeHtml(value) {
  * Place the spotlight, arrow, and bubble so the arrow points at the
  * target and the bubble stays fully on screen, including phone widths.
  */
+/** On phones the account links sit behind the Menu button; open it when the tour points there. */
+function openHeaderMenuFor(target) {
+  const bar = document.querySelector(".page-tabs");
+  const btn = document.getElementById("btnHeaderMenu");
+  if (!bar || !btn) return;
+  const inMenu = !!(target && target.closest && target.closest(".auth-chrome"));
+  if (inMenu && !bar.classList.contains("menu-open")) {
+    bar.classList.add("menu-open");
+    bar.dataset.tourOpened = "1";
+    btn.setAttribute("aria-expanded", "true");
+  } else if (!inMenu && bar.dataset.tourOpened) {
+    bar.classList.remove("menu-open");
+    delete bar.dataset.tourOpened;
+    btn.setAttribute("aria-expanded", "false");
+  }
+}
+
 export function layoutTourChrome(host, targetId) {
   if (!host) return { placed: false };
   const card = host.querySelector(".tutorial-card");
@@ -258,6 +275,7 @@ export function layoutTourChrome(host, targetId) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const target = targetId ? document.getElementById(targetId) : null;
+  openHeaderMenuFor(target);
   const visible = target && target.getClientRects().length > 0 && target.offsetParent !== null;
 
   if (!visible) {

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=20261114fix2" />
+  <link rel="stylesheet" href="css/app.css?v=20261114dlrr1" />
 </head>
 <body>
   <div class="page-tabs" role="tablist" aria-label="Drone Locator sections">
@@ -17,6 +17,7 @@
       <strong>Drone Locator</strong>
       <span>Search a stitched map for a lost aircraft.</span>
     </div>
+    <button type="button" id="btnHeaderMenu" class="header-menu-btn" aria-expanded="false" aria-controls="authChrome">&#9776; Menu</button>
     <button type="button" id="tabPlanner" role="tab" aria-selected="false">Planner</button>
     <button type="button" id="tabSaved" role="tab" aria-selected="false">Saved Missions</button>
     <button type="button" id="tabFind" role="tab" aria-selected="true">Drone Locator</button>
@@ -204,7 +205,17 @@
           <a class="btn primary" href="signup/" data-lock-signup>Sign up</a>
           <button type="button" class="btn primary" id="btnRequestAccess" data-lock-request hidden>Request access</button>
         </div>
-        <p class="okbox" data-lock-request-status hidden></p>
+        <div class="lock-confirm" data-lock-request-panel hidden>
+          <p><strong>Send a request to turn on Drone Locator for your account?</strong> An admin reads every request by hand.</p>
+          <label class="lock-note-label">How can we reach you? (phone or email, optional)
+            <input type="text" data-lock-request-contact maxlength="120" autocomplete="tel" placeholder="e.g. 555-123-4567" />
+          </label>
+          <div class="lock-actions">
+            <button type="button" class="btn primary" data-lock-request-confirm>Send request</button>
+            <button type="button" class="btn ghost" data-lock-request-cancel>Cancel</button>
+          </div>
+        </div>
+        <p class="okbox" data-lock-request-status role="status" aria-live="polite" hidden></p>
       </div>
     </div>
     <div id="findApp">
@@ -264,8 +275,9 @@
               </label>
             </div>
             <div class="tools">
-              <button type="button" id="btnFindSearch" class="primary" disabled>Search</button>
+              <button type="button" id="btnFindSearch" class="primary" disabled aria-describedby="findSearchHint">Search</button>
             </div>
+            <p class="note search-hint" id="findSearchHint">Search turns on after step 1 (load a search map) and step 2 (draw a box or upload a photo of your drone).</p>
             <p class="note" id="findProgress">The search runs on the server, so a large map will not freeze your phone. Turn on “Look for this color” to hunt for your drone’s paint against the field.</p>
             <details class="more-info">
               <summary>More options</summary>
@@ -284,7 +296,7 @@
               <p class="note">Use these only if you know the size of a small marking, how detailed the map is, or how high the photos were taken.</p>
             </details>
             <p class="warnbox" id="findWarn" hidden></p>
-            <p class="errorbox" id="findError" hidden></p>
+            <p class="errorbox" id="findError" role="alert" hidden></p>
           </section>
 
           <section>
@@ -323,6 +335,6 @@
   <footer id="siteFooter" class="site-footer">Drone Locator web 1.0.1</footer>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="js/app.js?v=20261114fix2"></script>
+  <script type="module" src="js/app.js?v=20261114dlrr1"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /** Survey-quality processing UI helpers. Status comes from find-api only. */
 
-import { apiFetch, apiBase, requestAuthHeaders } from "./auth.js?v=20261114fix2";
+import { apiFetch, apiBase, requestAuthHeaders } from "./auth.js?v=20261114dlrr1";
 import {
   registerXhr,
   clearXhr,
@@ -9,7 +9,7 @@ import {
   markReceived,
   snapshot,
   setFiles,
-} from "./upload-store.js?v=20261113r";
+} from "./upload-store.js?v=20261114dlrr1";
 
 export const STATUS_LABELS = {
   uploading: "Uploading",

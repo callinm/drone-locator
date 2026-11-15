@@ -1,6 +1,6 @@
-import { generateGrid, defaultSettings } from "./grid.js";
-import { FAA_MAX_ALTITUDE_M, CAMERAS, getCamera, MAVIC_AIR_2 } from "./camera.js";
-import { PRESETS, presetSettings, presetStats } from "./presets.js";
+import { generateGrid, defaultSettings } from "./grid.js?v=20261114dlrr1";
+import { FAA_MAX_ALTITUDE_M, CAMERAS, getCamera, MAVIC_AIR_2 } from "./camera.js?v=20261114dlrr1";
+import { PRESETS, presetSettings, presetStats } from "./presets.js?v=20261114dlrr1";
 
 const DRONE_KEY = "piletally_drone_model";
 
@@ -50,12 +50,12 @@ import {
   ftToM,
   mphToMps,
   mpsToMph,
-} from "./units.js";
-import { initTutorial } from "./tutorial.js?v=20261114fix2";
-import { attachBasemap, refreshMapSize } from "./basemap.js";
-import { evaluatePhotoCount, isStockpileMission } from "./photolimits.js";
-import { initPageTabs, setPageTab, onPageTab } from "./tabs.js";
-import { applyProductChrome, isLocator } from "./product.js";
+} from "./units.js?v=20261114dlrr1";
+import { initTutorial } from "./tutorial.js?v=20261114dlrr1";
+import { attachBasemap, refreshMapSize } from "./basemap.js?v=20261114dlrr1";
+import { evaluatePhotoCount, isStockpileMission } from "./photolimits.js?v=20261114dlrr1";
+import { initPageTabs, setPageTab, onPageTab } from "./tabs.js?v=20261114dlrr1";
+import { applyProductChrome, isLocator } from "./product.js?v=20261114dlrr1";
 import {
   buildMission,
   toMissionJson,
@@ -64,10 +64,10 @@ import {
   parseMissionJson,
   planFromMission,
   suggestedFilename,
-} from "./export.js";
-import { initSavedMissions } from "./saved-missions.js";
-import { initAuthChrome, isAuthenticated, onAuthChange, currentUser } from "./auth.js?v=20261114fix2";
-import { enqueue, getSettings, putSettings, readCache, writeCache } from "./sync.js";
+} from "./export.js?v=20261114dlrr1";
+import { initSavedMissions } from "./saved-missions.js?v=20261114dlrr1";
+import { initAuthChrome, isAuthenticated, onAuthChange, currentUser } from "./auth.js?v=20261114dlrr1";
+import { enqueue, getSettings, putSettings, readCache, writeCache } from "./sync.js?v=20261114dlrr1";
 
 // Public University of Illinois South Farms — demo only, not a real mission.
 const DEMO_POLYGON = [
@@ -583,10 +583,10 @@ syncDroneSelect();
 initAuthChrome();
 (async () => {
   if (isLocator()) {
-    const { initFinder } = await import("./finder.js?v=20261114fix2");
+    const { initFinder } = await import("./finder.js?v=20261114dlrr1");
     initFinder();
   } else {
-    const { initStockpile } = await import("./stockpile.js?v=20261113y");
+    const { initStockpile } = await import("./stockpile.js?v=20261114dlrr1");
     initStockpile();
   }
 })();
@@ -697,6 +697,28 @@ const tutorial = initTutorial({
 });
 window.piletallyTutorial = tutorial;
 el("btnShowTutorial")?.addEventListener("click", () => tutorial.replay());
+
+// Phones: account links live behind a Menu button so the map gets the screen.
+(function bindHeaderMenu() {
+  const btn = el("btnHeaderMenu");
+  const bar = btn ? btn.closest(".page-tabs") : null;
+  if (!btn || !bar) return;
+  const set = (open) => {
+    bar.classList.toggle("menu-open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  btn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    set(!bar.classList.contains("menu-open"));
+  });
+  document.addEventListener("click", (ev) => {
+    if (bar.classList.contains("menu-open") && !bar.contains(ev.target)) set(false);
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") set(false);
+  });
+  el("btnShowTutorial")?.addEventListener("click", () => set(false));
+})();
 
 
 onAuthChange(() => {
