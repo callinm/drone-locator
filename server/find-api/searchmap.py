@@ -665,9 +665,15 @@ def _tick_one(job: dict[str, Any]) -> None:
                 prev_end = end
             shown = max(shown, prev_end)
             shown = min(shown, max(prev_end, pct - 1))
-        fields: dict[str, Any] = {"status": "processing", "stage": stage, "progress_pct": shown}
+        fields: dict[str, Any] = {"status": "processing", "stage": stage}
+        started = job.get("stage_started_at") or _now()
         if stage != job.get("stage"):
-            fields["stage_started_at"] = _now()
+            fields["stage_started_at"] = started = _now()
+        # Long stages print little; creep toward (never past) the stage end so the bar keeps moving.
+        lo, hi = (8, 59) if stage == "matching_photos" else (60, 96)
+        frac = 1.0 - 2.0 ** (-max(0.0, _now() - float(started)) / 240.0)
+        shown = max(shown, int(lo + (hi - lo) * frac))
+        fields["progress_pct"] = min(97, shown)
         _update(job["id"], **fields)
         return
     if code == 30 or code == 50:
