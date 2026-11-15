@@ -26,6 +26,7 @@ import mailer
 import flights
 import admin_status
 import processing
+import searchmap
 import stockpile
 import syncstore
 from georef import GeoRef
@@ -67,13 +68,16 @@ async def lifespan(_app: FastAPI):
     feedback.init()
     locatorstore.init()
     locatorstore.migrate_from_legacy()
+    searchmap.init()
     admin_status.start_sampler()
     cleanup()
     stop_poller = processing.start_poller()
+    stop_searchmap = searchmap.start_poller()
     try:
         yield
     finally:
         stop_poller()
+        stop_searchmap()
         if _match_pool is not None:
             _match_pool.shutdown(wait=False, cancel_futures=False)
 
@@ -232,6 +236,7 @@ dashsync.register(app, require_login=_require_login, require_csrf=_require_csrf)
 flights.register(app, require_login=_require_login, require_csrf=_require_csrf)
 stockpile.register(app, require_mosaic=_require_mosaic_user)
 processing.register(app, require_mosaic=_require_mosaic_user, require_csrf=_require_csrf)
+searchmap.register(app, require_mosaic=_require_mosaic_user)
 
 
 def _owned_mosaic(mosaic_id: str, user: accounts.User):
